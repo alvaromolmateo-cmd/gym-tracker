@@ -8,7 +8,7 @@ import {
   exerciseById, historyOf, allSessions,
 } from '../store.js';
 import { todayKey, dayLabel } from '../dates.js';
-import { myoPlan, MYO_MINIS, MYO_BLOCKS, MYO_REST_FIRST, MYO_REST } from '../catalog.js';
+import { myoPlan, MYO_MINIS, MYO_BLOCKS } from '../catalog.js';
 import { fmtSet, fmtWeight, num, hasData, parseReps, entryTotals } from '../sets.js';
 import { suggest, dropWeights } from '../progression.js';
 import { sessionTotals, nextDay, dayVolume, sessionPRs, loadOf, weekNumber, mondayOf } from '../metrics.js';
@@ -156,7 +156,7 @@ function renderEntry(session, entry, index, open) {
         <span class="entry-num">${index + 1}</span>
         <span class="entry-titles">
           <span class="entry-name">${esc(ex.name)}</span>
-          <span class="entry-sub">${muscleChip(ex.muscle)}${typeChip(entry.type)}<span class="plan-text">${esc(planText(entry.plan))}</span></span>
+          <span class="entry-sub">${muscleChip(ex.muscle)}${typeChip(entry.type)}${entry.type === 'myo' ? '' : `<span class="plan-text">${esc(planText(entry.plan))}</span>`}</span>
         </span>
         <span class="entry-state">${t.sets ? `${fmtNum(Math.round(t.tonnage))} kg` : ''}${t.sets >= entry.sets.length ? icon('check-circle') : ''}</span>
       </button>
@@ -263,7 +263,6 @@ function renderMyo(entry, ex) {
           </label>`;
         }).join('')}
       </div>
-      <p class="hint">${MYO_REST_FIRST}" tras la serie de activación y ${MYO_REST}" entre tramos. Los cuentas tú: aquí no hay temporizador.</p>
     </div>`;
 }
 

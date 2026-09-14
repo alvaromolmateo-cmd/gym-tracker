@@ -1,7 +1,7 @@
 // Piezas de interfaz compartidas entre vistas.
 
 import { esc, icon, fmtNum } from '../ui.js';
-import { MUSCLE, MUSCLES, muscleName, typeLabel, myoPlan, profileOf, descOf, MYO_MINIS, MYO_REST_FIRST, MYO_REST } from '../catalog.js';
+import { MUSCLE, MUSCLES, muscleName, typeLabel, myoPlan, profileOf, descOf, MYO_REST_FIRST, MYO_REST } from '../catalog.js';
 import { exerciseById } from '../store.js';
 import { fmtSet, entryTotals } from '../sets.js';
 import { sessionTotals, loadOf } from '../metrics.js';
@@ -26,7 +26,7 @@ export function planText(plan) {
   if (!plan) return '';
   switch (plan.type) {
     case 'myo':
-      return `Myo-reps · al fallo + ${MYO_MINIS} mini-series + al fallo`;
+      return 'Myo-reps';
     case 'restpause': {
       const chain = (plan.scheme || []).join('×');
       return `Rest-pause · ${chain} con ${plan.clusterRest || 15}" entre tandas`;
@@ -57,7 +57,7 @@ export function planDetails(plan) {
 export function myoGuide(activation) {
   const p = myoPlan(activation);
   if (!activation) {
-    return `<p class="muted">Haz la serie de activación al fallo y apunta las reps: la tabla dirá cuántas mini-series tocan.</p>`;
+    return `<p class="muted">Apunta las reps de la activación y te digo las de las mini-series.</p>`;
   }
   const verdict = p.verdict === 'heavy'
     ? '<span class="warn">Menos de 6 reps: el peso se te ha ido, baja para la próxima.</span>'

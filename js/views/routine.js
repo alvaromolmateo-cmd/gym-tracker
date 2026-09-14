@@ -22,7 +22,7 @@ export function render() {
     <div class="page-head">
       <div>
         <h1>Rutina</h1>
-        <p class="muted">Lo que te ha puesto el entrenador. Editable — también el texto de cada ejercicio — y lo que cambies aquí sale en el próximo entreno.</p>
+        <p class="muted">Lo que te ha puesto el entrenador. Lo que cambies aquí sale en el próximo entreno.</p>
       </div>
       <div class="page-actions">
         <button class="btn" data-add-day>${icon('plus')} Día</button>
@@ -34,7 +34,7 @@ export function render() {
         <label class="fld grow">Nombre de la planificación
           <input class="input" type="text" value="${esc(st.routine.name)}" data-routine-name>
         </label>
-        <label class="fld">Semana 1 empezó el
+        <label class="fld fld-date">Semana 1 empezó el
           <input class="input" type="date" value="${esc(st.routine.startDate)}" data-routine-start>
         </label>
       </div>
@@ -72,7 +72,7 @@ function renderDay(day, index, total) {
               <span class="item-num">${i + 1}</span>
               <div class="item-main">
                 <div class="item-name">${esc(ex.name)} ${muscleChip(ex.muscle)} ${typeChip(item.type)}</div>
-                <div class="item-plan">${esc(planText(item))}</div>
+                ${item.type === 'myo' ? '' : `<div class="item-plan">${esc(planText(item))}</div>`}
                 ${planDetails(item)}
               </div>
               <div class="item-actions">
@@ -163,7 +163,7 @@ function openItem(dayId, itemId) {
           <label class="fld">RIR máx. <input class="input" type="number" min="0" max="5" value="${item.rirMax ?? 1}" data-f="rirMax"></label>
         </div>
 `,
-      myo: `<p class="muted">Secuencia fija del entrenador. Las reps de las mini-series salen de la tabla según la serie de activación; el texto de abajo es editable.</p>`,
+      myo: `<p class="muted">Las reps de las mini-series salen de la tabla según la serie de activación.</p>`,
       restpause: `
         <div class="form-row">
           <label class="fld grow">Esquema de reps <input class="input" type="text" value="${esc((item.scheme || []).join('×'))}" data-f="scheme"></label>

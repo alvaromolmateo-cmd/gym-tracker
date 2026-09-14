@@ -87,15 +87,14 @@ export function myoPlan(activation) {
 
 // ---------- Descripción de cada ejercicio ----------
 // Todo ejercicio de la rutina arrastra un texto descriptivo editable. Si no se ha tocado,
-// se usa el de su técnica.
-export function defaultDesc(type) {
-  if (type === 'myo') {
-    return `Serie de activación al fallo, ${MYO_REST_FIRST}" de descanso, mini-serie con las reps de la tabla del entrenador `
-      + `(6-8 reps → 2, 9-12 → 3, 13-16 → 4, 17-20 → 5), ${MYO_REST}" de descanso, otra mini-serie igual, `
-      + `${MYO_REST}" de descanso y una última serie al fallo.`;
-  }
+// se usa el de su técnica, que por ahora es vacío en todas: con la etiqueta «Myo-reps» basta
+// (la secuencia ya la recuerda la guía del entreno).
+export function defaultDesc() {
   return '';
 }
+
+// Texto por defecto que tenían las myo-reps hasta la v2; si quedó guardado tal cual, se descarta.
+export const isLegacyMyoDesc = (desc) => typeof desc === 'string' && desc.startsWith('Serie de activación al fallo, 40" de descanso');
 
 export const descOf = (item) => (item && item.desc != null ? item.desc : defaultDesc(item && item.type));
 

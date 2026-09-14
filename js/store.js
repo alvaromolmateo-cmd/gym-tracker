@@ -3,7 +3,7 @@
 
 import { uid } from './ui.js';
 import { todayKey } from './dates.js';
-import { defaultExercises } from './catalog.js';
+import { defaultExercises, isLegacyMyoDesc } from './catalog.js';
 import { emptySet } from './sets.js';
 import { ROUTINE_DAYS, ROUTINE_START, SEED_SESSIONS } from './seed.js';
 
@@ -122,7 +122,11 @@ function migrate(data) {
         name: d.name || 'Día',
         focus: d.focus || '',
         // v2: los ejercicios de la rutina ya no guardan descanso cronometrado ni serie extra.
-        items: (Array.isArray(d.items) ? d.items : []).map(({ rest, extra, ...it }) => ({ ...it, id: it.id || uid() })),
+        items: (Array.isArray(d.items) ? d.items : []).map(({ rest, extra, ...it }) => ({
+          ...it,
+          id: it.id || uid(),
+          ...(isLegacyMyoDesc(it.desc) ? { desc: null } : {}),
+        })),
       })),
     }
     : defaultRoutine();
@@ -137,6 +141,7 @@ function migrate(data) {
         ...e,
         id: e.id || uid(),
         sets: Array.isArray(e.sets) ? e.sets : [],
+        ...(e.plan && isLegacyMyoDesc(e.plan.desc) ? { plan: { ...e.plan, desc: null } } : {}),
       })),
     };
   }
