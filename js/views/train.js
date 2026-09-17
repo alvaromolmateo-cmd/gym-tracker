@@ -1,5 +1,6 @@
 // Vista «Entreno»: arranque de la sesión y registro en vivo, ejercicio a ejercicio.
-// Sin temporizadores: los descansos van por sensaciones, salvo los de las myo-reps, que se indican como texto.
+// Sin temporizadores ni cronómetro de sesión: los descansos van por sensaciones y el tiempo total
+// mentiría (es fácil olvidarse de cerrar el entreno). Lo que se mide es reps, series y tonelaje.
 
 import { esc, icon, fmtNum, toast, confirmDialog, openModal, closeModal, modalHeader } from '../ui.js';
 import {
@@ -8,12 +9,12 @@ import {
   exerciseById, historyOf, allSessions,
 } from '../store.js';
 import { todayKey, dayLabel } from '../dates.js';
-import { myoPlan, MYO_MINIS, MYO_BLOCKS } from '../catalog.js';
-import { fmtSet, fmtWeight, num, hasData, parseReps, entryTotals } from '../sets.js';
+import { myoPlan, dropSteps, MYO_MINIS, MYO_BLOCKS, SET_TYPES } from '../catalog.js';
+import { fmtSet, fmtWeight, num, hasData, parseReps, entryTotals, setReps } from '../sets.js';
 import { suggest, dropWeights } from '../progression.js';
 import { sessionTotals, nextDay, dayVolume, sessionPRs, loadOf, weekNumber, mondayOf } from '../metrics.js';
 import {
-  muscleChip, typeChip, planText, planDetails, myoGuide, sessionSummary,
+  muscleChip, typeChip, planText, planDetails, specRow, myoGuide, sessionSummary,
   dayOptions, exerciseOptions, FEELS,
 } from './shared.js';
 
@@ -74,7 +75,7 @@ function renderStart(ctx) {
           const last = historyOf(item.exerciseId, { type: item.type })[0];
           return `
             <li>
-              <span class="preview-name">${esc(ex.name)}</span>
+              <span class="preview-name">${esc(ex.name)}${typeChip(item.type)}</span>
               <span class="preview-plan">${esc(planText(item))}</span>
               <span class="preview-last">${last ? esc(fmtSet(last.sets.find((s) => hasData(s, last.type)) || last.sets[0], last.type, { bw: ex.bw })) : '—'}</span>
             </li>`;
@@ -105,7 +106,6 @@ function renderStart(ctx) {
 
 // ============================ Sesión en vivo ============================
 function renderSession(ctx, session) {
-  const st = getState();
   const t = sessionTotals(session);
   const openId = ctx.openEntry && session.entries.some((e) => e.id === ctx.openEntry)
     ? ctx.openEntry
@@ -118,9 +118,9 @@ function renderSession(ctx, session) {
         <p class="muted">${esc(session.focus)} · ${esc(dayLabel(session.date))}</p>
       </div>
       <div class="session-stats">
-        <span><b data-since="${esc(session.startedAt)}">0 min</b><small>en marcha</small></span>
+        <span><b data-reps>${t.reps}</b><small>reps</small></span>
         <span><b data-progress>${t.done}/${t.planned}</b><small>series</small></span>
-        <span><b>${fmtNum(Math.round(t.tonnage))}</b><small>kg</small></span>
+        <span><b data-tonnage>${fmtNum(Math.round(t.tonnage))}</b><small>kg</small></span>
       </div>
       <div class="btn-row">
         <button class="btn" data-exit>${icon('chevron-left')} Salir</button>
@@ -148,17 +148,22 @@ function renderEntry(session, entry, index, open) {
   const last = history[0];
   const tip = suggest({ exercise: ex, plan: entry.plan, history });
 
-  const state = t.sets === 0 ? '' : t.sets >= entry.sets.length ? ' is-done' : ' is-partial';
+  const done = t.sets >= entry.sets.length;
+  const state = t.sets === 0 ? '' : done ? ' is-done' : ' is-partial';
 
   return `
     <section class="entry${state}${open ? ' is-open' : ''}" data-entry="${esc(entry.id)}">
       <button class="entry-head" data-toggle-entry="${esc(entry.id)}">
         <span class="entry-num">${index + 1}</span>
-        <span class="entry-titles">
+        <span class="entry-top">
           <span class="entry-name">${esc(ex.name)}</span>
-          <span class="entry-sub">${muscleChip(ex.muscle)}${typeChip(entry.type)}${entry.type === 'myo' ? '' : `<span class="plan-text">${esc(planText(entry.plan))}</span>`}</span>
+          ${typeChip(entry.type)}
         </span>
-        <span class="entry-state">${t.sets ? `${fmtNum(Math.round(t.tonnage))} kg` : ''}${t.sets >= entry.sets.length ? icon('check-circle') : ''}</span>
+        <span class="entry-state">
+          ${t.tonnage ? `<b>${fmtNum(Math.round(t.tonnage))} kg</b>` : ''}
+          ${done ? icon('check-circle') : `<span class="entry-chev">${icon('chevron-right')}</span>`}
+        </span>
+        ${specRow(entry.plan, muscleChip(ex.muscle))}
       </button>
 
       ${open ? `
@@ -181,7 +186,7 @@ function renderEntry(session, entry, index, open) {
             </div>
           </div>
 
-          ${renderSets(entry, ex)}
+          ${renderSets(entry, ex, tip)}
 
           <label class="fld entry-note-fld">Anotación
             <input class="input" type="text" placeholder="Técnica, sensaciones, ajustes de máquina…" value="${esc(entry.note)}" data-entry-note="${esc(entry.id)}">
@@ -203,11 +208,11 @@ function renderEntry(session, entry, index, open) {
 }
 
 // ---------- Series según el tipo ----------
-function renderSets(entry, ex) {
+function renderSets(entry, ex, tip) {
   switch (entry.type) {
     case 'myo': return renderMyo(entry, ex);
     case 'restpause': return renderRestPause(entry, ex);
-    case 'dropset': return renderDrop(entry, ex);
+    case 'dropset': return renderDrop(entry, ex, tip);
     default: return renderNormal(entry, ex);
   }
 }
@@ -215,6 +220,11 @@ function renderSets(entry, ex) {
 const wInput = (entry, i, set, ex, extra = '') => `
   <input class="cell-input" type="number" inputmode="decimal" step="0.5" min="0" placeholder="${ex.bw ? 'BW' : 'kg'}"
     value="${set.w ?? ''}" data-set="${esc(entry.id)}" data-i="${i}" data-field="w" ${extra}>`;
+
+// Cabecera de una serie cuando hay más de una del mismo tipo troceado.
+const subHead = (i, total, chain = '') => (total > 1
+  ? `<div class="sub-head"><b>Serie ${i + 1} <small>de ${total}</small></b>${chain ? `<span class="chain-text">${esc(chain)}</span>` : ''}</div>`
+  : '');
 
 function renderNormal(entry, ex) {
   const plan = entry.plan;
@@ -237,77 +247,102 @@ function renderNormal(entry, ex) {
 
 // La secuencia es fija: activación al fallo, 40", mini de la tabla, 20", mini de la tabla, 20" y última al fallo.
 function renderMyo(entry, ex) {
-  const set = entry.sets[0] || {};
-  const act = num(set.r);
-  const p = myoPlan(act);
-  const minis = set.minis && set.minis.length ? set.minis : Array.from({ length: MYO_BLOCKS }, () => null);
   return `
     <div class="sets sets-myo">
-      <div class="myo-act">
-        <label>Peso ${wInput(entry, 0, set, ex)}</label>
-        <label>Activación (al fallo)
-          <input class="cell-input" type="number" inputmode="numeric" step="1" min="0" placeholder="reps"
-            value="${set.r ?? ''}" data-set="${esc(entry.id)}" data-i="0" data-field="r" data-myo-act>
-        </label>
-      </div>
-      <div data-myo-guide>${myoGuide(act)}</div>
-      <div class="myo-minis">
-        ${minis.map((v, k) => {
-          const fail = k >= MYO_MINIS;
-          return `
-          <label class="mini${fail ? ' mini-fail' : ''}">
-            <span>${fail ? 'Final · al fallo' : `Mini ${k + 1}${act ? ` · ${p.reps}` : ''}`}</span>
-            <input class="cell-input" type="number" inputmode="numeric" step="1" min="0" placeholder="${fail ? 'fallo' : (act ? p.reps : '—')}"
-              value="${v ?? ''}" data-set="${esc(entry.id)}" data-i="0" data-field="mini" data-k="${k}">
-            <button class="set-ok sm" data-ok="${esc(entry.id)}" data-i="0" aria-label="Tramo hecho">${icon('check')}</button>
-          </label>`;
-        }).join('')}
-      </div>
+      ${entry.sets.map((set, i) => {
+        const act = num(set.r);
+        const p = myoPlan(act);
+        const minis = set.minis && set.minis.length ? set.minis : Array.from({ length: MYO_BLOCKS }, () => null);
+        return `
+        <div class="myo-set">
+          ${subHead(i, entry.sets.length)}
+          <div class="myo-act">
+            <label><span>Peso</span>${wInput(entry, i, set, ex)}</label>
+            <label><span>Activación · al fallo</span>
+              <input class="cell-input" type="number" inputmode="numeric" step="1" min="0" placeholder="reps"
+                value="${set.r ?? ''}" data-set="${esc(entry.id)}" data-i="${i}" data-field="r" data-myo-act>
+            </label>
+          </div>
+          <div data-myo-guide>${myoGuide(act)}</div>
+          <div class="myo-minis">
+            ${minis.map((v, k) => {
+              const fail = k >= MYO_MINIS;
+              return `
+              <label class="mini${fail ? ' mini-fail' : ''}${v != null && v !== '' ? ' is-filled' : ''}">
+                <span>${fail ? 'Final · al fallo' : `Mini ${k + 1}${act ? ` · ${p.reps}` : ''}`}</span>
+                <input class="cell-input" type="number" inputmode="numeric" step="1" min="0" placeholder="${fail ? 'fallo' : (act ? p.reps : '—')}"
+                  value="${v ?? ''}" data-set="${esc(entry.id)}" data-i="${i}" data-field="mini" data-k="${k}">
+                <button class="set-ok sm" data-ok="${esc(entry.id)}" data-i="${i}" aria-label="Tramo hecho">${icon('check')}</button>
+              </label>`;
+            }).join('')}
+          </div>
+        </div>`;
+      }).join('')}
     </div>`;
 }
 
 function renderRestPause(entry, ex) {
-  const set = entry.sets[0] || {};
   const scheme = entry.plan.scheme || [];
-  const clusters = set.clusters || scheme.map(() => null);
+  const target = scheme.reduce((a, b) => a + b, 0);
   return `
     <div class="sets sets-rp">
-      <div class="rp-top">
-        <label>Peso ${wInput(entry, 0, set, ex)}</label>
-        <span class="muted">${scheme.join('×')} · ${entry.plan.clusterRest || 15}" entre tandas</span>
-      </div>
-      <div class="rp-boxes">
-        ${clusters.map((v, k) => `
-          <label class="mini">
-            <span>${k + 1}.ª · ${scheme[k] ?? '—'}</span>
-            <input class="cell-input" type="number" inputmode="numeric" step="1" min="0" placeholder="${scheme[k] ?? ''}"
-              value="${v ?? ''}" data-set="${esc(entry.id)}" data-i="0" data-field="cluster" data-k="${k}">
-            <button class="set-ok sm" data-ok="${esc(entry.id)}" data-i="0" aria-label="Tanda hecha">${icon('check')}</button>
-          </label>`).join('')}
-      </div>
+      ${entry.sets.map((set, i) => {
+        const clusters = set.clusters && set.clusters.length ? set.clusters : scheme.map(() => null);
+        const total = setReps(set, 'restpause');
+        return `
+        <div class="rp-set">
+          ${subHead(i, entry.sets.length)}
+          <div class="rp-top">
+            <label><span>Peso</span>${wInput(entry, i, set, ex)}</label>
+            <div class="rp-goal">
+              ${icon('clock')} <b>${entry.plan.clusterRest || 15}"</b> entre tandas · objetivo
+              <b>${esc(scheme.join('+') || '—')}</b> = <b>${target}</b> reps
+            </div>
+          </div>
+          <div class="rp-boxes">
+            ${clusters.map((v, k) => `
+              <label class="mini${v != null && v !== '' ? ' is-filled' : ''}">
+                <span>${k + 1}.ª · ${scheme[k] ?? '—'}</span>
+                <input class="cell-input" type="number" inputmode="numeric" step="1" min="0" placeholder="${scheme[k] ?? ''}"
+                  value="${v ?? ''}" data-set="${esc(entry.id)}" data-i="${i}" data-field="cluster" data-k="${k}">
+                <button class="set-ok sm" data-ok="${esc(entry.id)}" data-i="${i}" aria-label="Tanda hecha">${icon('check')}</button>
+              </label>`).join('')}
+          </div>
+          <div class="rp-total">Llevas <b data-rp-total>${total}</b> de <b>${target}</b> reps</div>
+        </div>`;
+      }).join('')}
     </div>`;
 }
 
-function renderDrop(entry, ex) {
-  const scheme = [...(entry.plan.dropScheme || [])];
-  if (entry.plan.dropFail) scheme.push('fallo');
+function renderDrop(entry, ex, tip = {}) {
+  const steps = dropSteps(entry.plan);
+  const chain = steps.join(' → ');
   return `
     <div class="sets sets-drop">
       ${entry.sets.map((set, i) => {
-        const drops = set.drops && set.drops.length ? set.drops : scheme.map(() => ({ w: null, r: null }));
-        const sugg = dropWeights(drops[0]?.w, ex, scheme.length, entry.plan.dropPct || 15);
+        const drops = set.drops && set.drops.length ? set.drops : steps.map(() => ({ w: null, r: null }));
+        // Pesos orientativos de la cascada: desde lo que ya haya puesto o desde la sugerencia de hoy.
+        const sugg = dropWeights(drops[0]?.w ?? tip.weight, ex, steps.length, entry.plan.dropPct || 15);
         return `
           <div class="drop-set">
-            <div class="drop-head"><b>Serie ${i + 1}</b><span class="muted">${scheme.join('×')}</span></div>
+            <div class="drop-head">
+              <b>Serie ${i + 1} <small>de ${entry.sets.length}</small></b>
+              <span class="chain-text">${esc(chain)}</span>
+            </div>
             <div class="drop-rows">
-              ${scheme.map((target, k) => `
-                <div class="drop-row">
-                  <span class="drop-num">${k + 1}</span>
-                  <input class="cell-input" type="number" inputmode="decimal" step="0.5" min="0" placeholder="${sugg[k] ?? ''}"
-                    value="${drops[k]?.w ?? ''}" data-set="${esc(entry.id)}" data-i="${i}" data-field="dropw" data-k="${k}">
-                  <input class="cell-input" type="number" inputmode="numeric" step="1" min="0" placeholder="${esc(String(target))}"
-                    value="${drops[k]?.r ?? ''}" data-set="${esc(entry.id)}" data-i="${i}" data-field="dropr" data-k="${k}">
-                </div>`).join('')}
+              <div class="drop-row drop-cols"><span></span><span>Peso</span><span>Reps</span></div>
+              ${steps.map((tgt, k) => {
+                const fail = tgt === 'fallo';
+                const d = drops[k] || {};
+                return `
+                <div class="drop-row${fail ? ' is-fail' : ''}${d.r != null && d.r !== '' ? ' is-filled' : ''}">
+                  <span class="drop-step">${fail ? 'Fallo' : `${k + 1}.º`}</span>
+                  <input class="cell-input" type="number" inputmode="decimal" step="0.5" min="0" placeholder="${sugg[k] ?? (ex.bw ? 'BW' : 'kg')}"
+                    value="${d.w ?? ''}" data-set="${esc(entry.id)}" data-i="${i}" data-field="dropw" data-k="${k}">
+                  <input class="cell-input" type="number" inputmode="numeric" step="1" min="0" placeholder="${esc(String(tgt))}"
+                    value="${d.r ?? ''}" data-set="${esc(entry.id)}" data-i="${i}" data-field="dropr" data-k="${k}">
+                </div>`;
+              }).join('')}
             </div>
           </div>`;
       }).join('')}
@@ -356,8 +391,8 @@ export function mount(root, ctx) {
         }
         case 'dropw':
         case 'dropr': {
-          const scheme = [...(entry.plan.dropScheme || []), ...(entry.plan.dropFail ? ['fallo'] : [])];
-          const drops = (set.drops && set.drops.length ? set.drops : scheme.map(() => ({ w: null, r: null }))).map((d) => ({ ...d }));
+          const steps = dropSteps(entry.plan);
+          const drops = (set.drops && set.drops.length ? set.drops : steps.map(() => ({ w: null, r: null }))).map((d) => ({ ...d }));
           drops[k] = drops[k] || { w: null, r: null };
           drops[k][input.dataset.field === 'dropw' ? 'w' : 'r'] = v;
           patchSet(session.id, entryId, i, { drops }, { silent: true });
@@ -376,20 +411,22 @@ export function mount(root, ctx) {
   }));
 
   // --- Sugerencia y copia ---
+  // «Usar en todas las series» manda: pisa también los pesos que ya hubiera puestos.
   root.querySelectorAll('[data-use-tip]').forEach((b) => b.addEventListener('click', () => {
     const entry = session.entries.find((e) => e.id === b.dataset.useTip);
     const w = Number(b.dataset.w);
     entry.sets.forEach((set, i) => {
       if (entry.type === 'dropset') {
-        const drops = (set.drops || []).map((d) => ({ ...d }));
-        if (drops[0] && drops[0].w == null) drops[0].w = w;
+        const steps = dropSteps(entry.plan);
+        const drops = (set.drops && set.drops.length ? set.drops : steps.map(() => ({ w: null, r: null }))).map((d) => ({ ...d }));
+        drops[0] = { ...(drops[0] || { r: null }), w };
         patchSet(session.id, entry.id, i, { drops }, { silent: true });
-      } else if (set.w == null) {
+      } else {
         patchSet(session.id, entry.id, i, { w }, { silent: true });
       }
     });
     patchSession(session.id, {});
-    toast(`Cargado ${fmtNum(w, 1)} kg`);
+    toast(`Cargado ${fmtNum(w, 1)} kg en todas las series`);
   }));
 
   root.querySelectorAll('[data-copy-last]').forEach((b) => b.addEventListener('click', () => {
@@ -460,20 +497,35 @@ function refreshLive(root, session, entryId, input) {
   const row = input.closest('.set-row, .mini, .drop-row');
   if (row) row.classList.toggle('is-filled', !!input.value);
 
+  // Myo-reps: la guía y las reps de las mini-series salen de la activación.
   if (input.dataset.myoAct != null) {
-    const guide = root.querySelector(`[data-entry="${CSS.escape(entryId)}"] [data-myo-guide]`);
-    if (guide) guide.innerHTML = myoGuide(num(input.value));
-    const p = myoPlan(num(input.value));
-    root.querySelectorAll(`[data-entry="${CSS.escape(entryId)}"] .myo-minis .mini`).forEach((el, k) => {
+    const block = input.closest('.myo-set');
+    const act = num(input.value);
+    const p = myoPlan(act);
+    const guide = block?.querySelector('[data-myo-guide]');
+    if (guide) guide.innerHTML = myoGuide(act);
+    block?.querySelectorAll('.myo-minis .mini').forEach((el, k) => {
       if (k >= MYO_MINIS) return;
-      el.querySelector('span').textContent = `Mini ${k + 1}${input.value ? ` · ${p.reps}` : ''}`;
-      el.querySelector('input').placeholder = input.value ? p.reps : '—';
+      el.querySelector('span').textContent = `Mini ${k + 1}${act ? ` · ${p.reps}` : ''}`;
+      el.querySelector('input').placeholder = act ? p.reps : '—';
     });
   }
 
+  // Rest-pause: cuántas reps llevas del esquema.
+  if (input.dataset.field === 'cluster') {
+    const block = input.closest('.rp-set');
+    const total = block?.querySelector('[data-rp-total]');
+    if (total) total.textContent = setReps(entry.sets[Number(input.dataset.i)], 'restpause');
+  }
+
   const t = sessionTotals(session);
-  const badge = root.querySelector('[data-progress]');
-  if (badge) badge.textContent = `${t.done}/${t.planned}`;
+  const set = (sel, value) => {
+    const el = root.querySelector(sel);
+    if (el) el.textContent = value;
+  };
+  set('[data-progress]', `${t.done}/${t.planned}`);
+  set('[data-reps]', t.reps);
+  set('[data-tonnage]', fmtNum(Math.round(t.tonnage)));
 }
 
 // ---------- Añadir ejercicio suelto ----------
@@ -489,12 +541,10 @@ function openAddExercise(sessionId) {
         </label>
         <label class="fld">Tipo de serie
           <select class="select" data-type>
-            <option value="normal">Series normales</option>
-            <option value="myo">Myo-reps</option>
-            <option value="restpause">Rest-pause</option>
-            <option value="dropset">Drop set</option>
+            ${Object.values(SET_TYPES).map((t) => `<option value="${t.id}">${esc(t.label)}</option>`).join('')}
           </select>
         </label>
+        <p class="hint">Se añade solo a este entreno, con la prescripción de partida de ese tipo. La rutina no se toca.</p>
       </div>
       <div class="modal-foot">
         <button class="btn" data-modal-close>Cancelar</button>
@@ -518,7 +568,11 @@ function openFinish(sessionId) {
     render: () => `
       ${modalHeader('Terminar entreno', esc(`${session.dayName} · ${dayLabel(session.date)}`))}
       <div class="modal-body">
-        ${sessionSummary(session)}
+        <div class="finish-stats">
+          <span><b>${t.reps}</b><small>reps</small></span>
+          <span><b>${fmtNum(t.effective, 1)}</b><small>series</small></span>
+          <span><b>${fmtNum(Math.round(t.tonnage))}</b><small>kg de tonelaje</small></span>
+        </div>
         ${prs.length ? `
           <div class="pr-box">
             <div class="pr-head">${icon('trophy')} ${prs.length} récord${prs.length > 1 ? 's' : ''} hoy</div>

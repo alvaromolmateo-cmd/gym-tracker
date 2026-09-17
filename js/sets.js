@@ -8,6 +8,7 @@
 // `w` a 0 significa peso corporal (ejercicios con bw: true).
 
 import { fmtNum } from './ui.js';
+import { dropSteps } from './catalog.js';
 
 // «7+6» → 13. Acepta también «7 + 6», «13» y coma decimal.
 export function parseReps(text) {
@@ -141,7 +142,10 @@ export function entryTotals(entry, load = 0) {
 export const emptySet = (type, plan = {}) => {
   if (type === 'myo') return { w: null, r: null, minis: [null, null, null] };
   if (type === 'restpause') return { w: null, clusters: (plan.scheme || [8, 5, 5]).map(() => null) };
-  if (type === 'dropset') return { drops: (plan.dropScheme || [6, 8]).map(() => ({ w: null, r: null })) };
+  if (type === 'dropset') {
+    const steps = dropSteps(plan).length || 2; // el escalón al fallo también tiene su casilla
+    return { drops: Array.from({ length: steps }, () => ({ w: null, r: null })) };
+  }
   return { w: null, r: null, rir: null, raw: '' };
 };
 

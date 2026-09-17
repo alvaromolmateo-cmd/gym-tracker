@@ -1,14 +1,16 @@
 // Vista «Rutina»: la planificación actual, editable día a día.
+// Cada ejercicio se lee en fichas (series / reps / RIR o lo que pida su técnica) y se edita
+// desde una ficha única con los campos propios de cada tipo de serie.
 
 import { esc, icon, fmtNum, toast, confirmDialog, openModal, closeModal, modalHeader } from '../ui.js';
 import {
   getState, exerciseById, patchRoutine, addDay, patchDay, removeDay, moveDay,
   addItem, patchItem, removeItem, moveItem,
 } from '../store.js';
-import { MUSCLES, profileOf, SET_TYPES, descOf } from '../catalog.js';
+import { MUSCLES, SET_TYPES, descOf, defaultPlan } from '../catalog.js';
 import { dayVolume } from '../metrics.js';
 import { profileSummary } from '../progression.js';
-import { muscleChip, typeChip, planText, planDetails, exerciseOptions, volumeBars } from './shared.js';
+import { muscleChip, typeChip, planDetails, specRow, exerciseOptions, volumeBars } from './shared.js';
 
 export function render() {
   const st = getState();
@@ -49,6 +51,7 @@ export function render() {
 
 function renderDay(day, index, total) {
   const vol = dayVolume(day);
+  const top = Object.entries(vol.byMuscle).sort((a, b) => b[1] - a[1]).slice(0, 4);
   return `
     <div class="card day-card" data-day="${esc(day.id)}">
       <div class="card-head">
@@ -64,17 +67,19 @@ function renderDay(day, index, total) {
         </div>
       </div>
 
+      ${top.length ? `<div class="day-meta">${icon('layers')} ${day.items.length} ejercicios ${top.map(([m]) => muscleChip(m)).join('')}</div>` : ''}
+
       <ol class="item-list">
         ${day.items.map((item, i) => {
           const ex = exerciseById(item.exerciseId);
           return `
             <li class="item-row">
               <span class="item-num">${i + 1}</span>
-              <div class="item-main">
-                <div class="item-name">${esc(ex.name)} ${muscleChip(ex.muscle)} ${typeChip(item.type)}</div>
-                ${item.type === 'myo' ? '' : `<div class="item-plan">${esc(planText(item))}</div>`}
+              <button class="item-main" data-edit-item="${esc(item.id)}" data-day="${esc(day.id)}">
+                <span class="item-name">${esc(ex.name)}${typeChip(item.type)}</span>
+                ${specRow(item, muscleChip(ex.muscle))}
                 ${planDetails(item)}
-              </div>
+              </button>
               <div class="item-actions">
                 <button class="icon-btn sm" data-edit-item="${esc(item.id)}" data-day="${esc(day.id)}" aria-label="Editar">${icon('edit')}</button>
                 <button class="icon-btn sm" data-move-item="${esc(item.id)}" data-day="${esc(day.id)}" data-dir="-1" aria-label="Subir">${icon('arrow-up')}</button>
@@ -111,6 +116,7 @@ export function mount(root) {
 // ---------- Alta de ejercicio en un día ----------
 function openNewItem(dayId) {
   const st = getState();
+  let type = 'normal';
   openModal({
     size: 'sm',
     render: () => `
@@ -119,88 +125,129 @@ function openNewItem(dayId) {
         <label class="fld">Ejercicio
           <select class="select" data-ex>${exerciseOptions(st.exercises)}</select>
         </label>
-        <label class="fld">Tipo de serie
-          <select class="select" data-type>
-            ${Object.values(SET_TYPES).map((t) => `<option value="${t.id}">${esc(t.label)}</option>`).join('')}
-          </select>
-        </label>
-        <p class="hint">Luego puedes afinar series, reps, RIR y tempo desde el lápiz.</p>
+        <label class="lbl">Tipo de serie</label>
+        ${typePicker(type)}
+        <p class="hint" data-type-hint>${esc(SET_TYPES[type].hint)}</p>
       </div>
       <div class="modal-foot">
         <button class="btn" data-modal-close>Cancelar</button>
         <button class="btn btn-primary" data-ok>Añadir</button>
       </div>`,
     mount: (panel) => {
+      panel.querySelectorAll('[data-type]').forEach((b) => b.addEventListener('click', () => {
+        type = b.dataset.type;
+        panel.querySelectorAll('[data-type]').forEach((x) => x.classList.toggle('on', x.dataset.type === type));
+        panel.querySelector('[data-type-hint]').textContent = SET_TYPES[type].hint;
+      }));
       panel.querySelector('[data-ok]').addEventListener('click', () => {
-        addItem(dayId, panel.querySelector('[data-ex]').value, panel.querySelector('[data-type]').value);
+        const id = addItem(dayId, panel.querySelector('[data-ex]').value, type);
         closeModal();
+        if (id) openItem(dayId, id);
       });
     },
   });
 }
 
 // ---------- Edición de la prescripción ----------
-const parseList = (text) => String(text || '').split(/[x×,\s]+/).map((n) => Number(n)).filter((n) => Number.isFinite(n) && n > 0);
+// Acepta 10+10+10, 6→8, 6x8, «6 8» o 6,8: todo se convierte en la misma lista de números.
+const parseList = (text) => String(text || '').split(/[x×,+\s→-]+/).map((n) => Number(n)).filter((n) => Number.isFinite(n) && n > 0);
+
+const typePicker = (current) => `
+  <div class="seg seg-wrap type-seg">
+    ${Object.values(SET_TYPES).map((t) => `
+      <button class="seg-btn${current === t.id ? ' on' : ''}" data-type="${t.id}">${icon(t.icon)} ${esc(t.short)}</button>`).join('')}
+  </div>`;
+
+// Lo que verá en el entreno, para comprobar de un vistazo que la prescripción es la que toca.
+const previewHtml = (item, ex) => `
+  <div class="preview-head">${icon('play')} Así lo verás en el entreno</div>
+  <div class="preview-entry">
+    <span class="entry-name">${esc(ex.name)}</span>${typeChip(item.type)}
+  </div>
+  ${specRow(item, muscleChip(ex.muscle))}
+  ${planDetails(item)}`;
 
 function openItem(dayId, itemId) {
+  const find = () => {
+    const day = getState().routine.days.find((d) => d.id === dayId);
+    return day?.items.find((i) => i.id === itemId);
+  };
+
   const draw = () => {
-    const st = getState();
-    const day = st.routine.days.find((d) => d.id === dayId);
-    const item = day?.items.find((i) => i.id === itemId);
+    const item = find();
     if (!item) return '';
     const ex = exerciseById(item.exerciseId);
 
     const typeFields = {
       normal: `
         <div class="form-row">
-          <label class="fld">Series <input class="input" type="number" min="1" max="10" value="${item.sets ?? 3}" data-f="sets"></label>
           <label class="fld">Reps mín. <input class="input" type="number" min="1" value="${item.repsMin ?? 8}" data-f="repsMin"></label>
           <label class="fld">Reps máx. <input class="input" type="number" min="1" value="${item.repsMax ?? 10}" data-f="repsMax"></label>
+          <label class="fld">RIR <input class="input" type="text" placeholder="0-1" value="${esc(item.rir || '')}" data-f="rir"></label>
         </div>
-        <div class="form-row">
-          <label class="fld grow">Reps (texto libre) <input class="input" type="text" placeholder="p. ej. 7+6" value="${esc(item.repsText || '')}" data-f="repsText"></label>
-          <label class="fld">RIR <input class="input" type="text" value="${esc(item.rir || '')}" data-f="rir"></label>
-          <label class="fld">RIR máx. <input class="input" type="number" min="0" max="5" value="${item.rirMax ?? 1}" data-f="rirMax"></label>
-        </div>
-`,
-      myo: `<p class="muted">Las reps de las mini-series salen de la tabla según la serie de activación.</p>`,
+        <label class="fld">Reps encadenadas (texto libre)
+          <input class="input" type="text" placeholder="p. ej. 7+6" value="${esc(item.repsText || '')}" data-f="repsText">
+        </label>
+        <p class="hint">Para series seguidas dentro de la misma serie: «7+6» son 7 reps lentas y 6 normales sin soltar el peso. Si lo rellenas, manda sobre el rango.</p>
+        <label class="fld">RIR máximo que cuenta como objetivo cumplido
+          <input class="input" type="number" min="0" max="5" value="${item.rirMax ?? 1}" data-f="rirMax">
+        </label>
+        <p class="hint">Lo usa la sobrecarga progresiva: si llegas al tope de reps con este RIR o menos, toca subir peso.</p>`,
+      myo: `
+        <p class="hint">Secuencia fija del entrenador: activación al fallo → 40" → mini-serie de la tabla → 20" → mini-serie → 20" → última al fallo. Las reps de las mini-series salen de la tabla según la activación, no hay nada que rellenar aquí.</p>`,
       restpause: `
-        <div class="form-row">
-          <label class="fld grow">Esquema de reps <input class="input" type="text" value="${esc((item.scheme || []).join('×'))}" data-f="scheme"></label>
-          <label class="fld">Descanso entre tandas (s) <input class="input" type="number" min="5" max="60" value="${item.clusterRest ?? 15}" data-f="clusterRest"></label>
-        </div>`,
+        <label class="fld">Esquema de reps
+          <input class="input" type="text" value="${esc((item.scheme || []).join(' + '))}" data-f="scheme">
+        </label>
+        <p class="hint">Reps de cada tanda dentro de la misma serie, separadas por «+» (p. ej. 8 + 5 + 5 + 3 + 3 + 3 + 3).</p>
+        <label class="fld">Descanso entre tandas (segundos)
+          <input class="input" type="number" min="5" max="60" value="${item.clusterRest ?? 15}" data-f="clusterRest">
+        </label>`,
       dropset: `
+        <label class="fld">Escalones de reps
+          <input class="input" type="text" value="${esc((item.dropScheme || []).join(' → '))}" data-f="dropScheme">
+        </label>
+        <p class="hint">Reps objetivo en cada bajada de peso, de más pesado a más ligero (p. ej. 6 → 8). Son escalones de la misma serie, no series distintas.</p>
         <div class="form-row">
-          <label class="fld grow">Escalones de reps <input class="input" type="text" value="${esc((item.dropScheme || []).join('×'))}" data-f="dropScheme"></label>
-          <label class="fld">Series <input class="input" type="number" min="1" max="5" value="${item.sets ?? 2}" data-f="sets"></label>
-        </div>
-        <div class="form-row">
-          <label class="fld">Bajada de peso (%) <input class="input" type="number" min="5" max="40" value="${item.dropPct ?? 15}" data-f="dropPct"></label>
-          <label class="fld">Último al fallo
-            <select class="select" data-f="dropFail"><option value="1"${item.dropFail ? ' selected' : ''}>Sí</option><option value="0"${!item.dropFail ? ' selected' : ''}>No</option></select>
+          <label class="fld">Bajada de peso (%)
+            <input class="input" type="number" min="5" max="40" value="${item.dropPct ?? 15}" data-f="dropPct">
           </label>
-        </div>`,
+          <div class="fld">Último escalón al fallo
+            <span class="seg">
+              <button class="seg-btn${item.dropFail ? ' on' : ''}" data-fail="1">Sí</button>
+              <button class="seg-btn${!item.dropFail ? ' on' : ''}" data-fail="0">No</button>
+            </span>
+          </div>
+        </div>
+        <p class="hint">Con «Sí» se añade un escalón extra sin objetivo de reps: bajas el peso una vez más y aguantas hasta el fallo.</p>`,
     };
 
     return `
       ${modalHeader(esc(ex.name), esc(`${muscleLabel(ex.muscle)} · ${profileSummary(ex)}`))}
       <div class="modal-body">
-        <label class="fld">Tipo de serie
-          <select class="select" data-f="type">
-            ${Object.values(SET_TYPES).map((t) => `<option value="${t.id}"${item.type === t.id ? ' selected' : ''}>${esc(t.label)}</option>`).join('')}
-          </select>
+        <div class="preview-box" data-preview>${previewHtml(item, ex)}</div>
+
+        <label class="lbl">Tipo de serie</label>
+        ${typePicker(item.type)}
+        <p class="hint">${esc(SET_TYPES[item.type]?.hint || '')}</p>
+
+        <label class="fld fld-sets">Series
+          <input class="input" type="number" min="1" max="10" value="${item.sets ?? 1}" data-f="sets">
         </label>
+
         ${typeFields[item.type] ?? typeFields.normal}
-        <label class="fld">Descripción del ejercicio
-          <textarea class="input textarea" rows="3" placeholder="Cómo se hace, qué buscar…" data-f="desc">${esc(descOf(item))}</textarea>
-        </label>
-        <p class="hint">Este texto es el que ves en la rutina y durante el entreno.</p>
+
+        <h3 class="sub-h">${icon('quote')} Anotaciones (opcionales)</h3>
         <label class="fld">Tempo
           <input class="input" type="text" placeholder='3" de bajada + 1" isométrico' value="${esc(item.tempo || '')}" data-f="tempo">
         </label>
         <label class="fld">Nota del entrenador
-          <input class="input" type="text" value="${esc(item.note || '')}" data-f="note">
+          <input class="input" type="text" placeholder="Series descendentes, codos apoyados…" value="${esc(item.note || '')}" data-f="note">
         </label>
+        <label class="fld">Descripción del ejercicio
+          <textarea class="input textarea" rows="2" placeholder="Cómo se hace, qué buscar…" data-f="desc">${esc(descOf(item))}</textarea>
+        </label>
+        <p class="hint">Lo que escribas aquí sale en la rutina y durante el entreno. Si lo dejas vacío, no aparece nada.</p>
       </div>
       <div class="modal-foot">
         <button class="btn btn-danger-ghost" data-remove>${icon('trash')} Quitar del día</button>
@@ -213,33 +260,46 @@ function openItem(dayId, itemId) {
     // Lo tecleado se guarda en silencio para no perder el foco: al cerrar se repinta la rutina.
     onClose: () => patchItem(dayId, itemId, {}),
     mount: (panel) => {
+      if (!find()) return;
+      const ex = () => exerciseById(find()?.exerciseId);
+      // Con los campos de texto no se repinta la ficha (se perdería el foco): se refresca la vista previa a mano.
+      const refreshPreview = () => {
+        const box = panel.querySelector('[data-preview]');
+        const item = find();
+        if (box && item) box.innerHTML = previewHtml(item, ex());
+      };
+
+      panel.querySelectorAll('[data-type]').forEach((b) => b.addEventListener('click', () => {
+        const v = b.dataset.type;
+        const item = find();
+        if (!item || item.type === v) return;
+        // Al cambiar de técnica se ponen sus campos propios y se suelta la descripción de la anterior.
+        const patch = { ...defaultPlan(v), desc: null };
+        if (v === 'restpause' && item.scheme?.length) delete patch.scheme;
+        if (v === 'dropset' && item.dropScheme?.length) delete patch.dropScheme;
+        patchItem(dayId, itemId, patch);
+      }));
+
+      panel.querySelectorAll('[data-fail]').forEach((b) => b.addEventListener('click', () => {
+        patchItem(dayId, itemId, { dropFail: b.dataset.fail === '1' });
+      }));
+
       panel.querySelectorAll('[data-f]').forEach((input) => {
         const field = input.dataset.f;
-        const commit = (rerender) => {
+        input.addEventListener('input', () => {
           const v = input.value;
           const patch = {};
-          if (field === 'type') {
-            // Al cambiar de tipo hay que dejar puestos los campos que ese tipo necesita
-            // y soltar la descripción del anterior para que vuelva la suya.
-            patch.type = v;
-            patch.desc = null;
-            const item = getState().routine.days.find((d) => d.id === dayId).items.find((i) => i.id === itemId);
-            if (v === 'restpause' && !item.scheme?.length) Object.assign(patch, { scheme: [10, 10, 10], clusterRest: 20, sets: 1 });
-            if (v === 'dropset' && !item.dropScheme?.length) Object.assign(patch, { dropScheme: [6, 8], dropPct: 20, dropFail: true, sets: 2 });
-            if (v === 'myo') patch.sets = 1;
-            if (v === 'normal' && !item.repsMin) Object.assign(patch, { sets: 3, repsMin: 8, repsMax: 10, rir: '0-1', rirMax: 1 });
-          } else if (field === 'scheme') patch.scheme = parseList(v);
+          if (field === 'scheme') patch.scheme = parseList(v);
           else if (field === 'dropScheme') patch.dropScheme = parseList(v);
-          else if (field === 'dropFail') patch.dropFail = v === '1';
           else if (['sets', 'repsMin', 'repsMax', 'rirMax', 'clusterRest', 'dropPct'].includes(field)) {
             patch[field] = v === '' ? null : Number(v);
           } else patch[field] = v;
-          patchItem(dayId, itemId, patch, { silent: !rerender });
-        };
-        const rerender = input.tagName === 'SELECT' || field === 'type';
-        input.addEventListener(input.tagName === 'SELECT' ? 'change' : 'input', () => commit(rerender));
+          patchItem(dayId, itemId, patch, { silent: true });
+          refreshPreview();
+        });
       });
-      panel.querySelector('[data-remove]').addEventListener('click', () => {
+
+      panel.querySelector('[data-remove]')?.addEventListener('click', () => {
         removeItem(dayId, itemId);
         closeModal();
         toast('Ejercicio quitado');

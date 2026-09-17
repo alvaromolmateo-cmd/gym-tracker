@@ -13,6 +13,7 @@ export function render(ctx) {
   const week = weekStats(monday);
   const sessions = allSessions().filter((s) => s.date >= monday && s.date <= end);
   const n = weekNumber(monday, st.routine.startDate);
+  const records = sessions.reduce((a, s) => a + sessionPRs(s).length, 0);
 
   return `
     <div class="page-head page-head-compact">
@@ -31,7 +32,7 @@ export function render(ctx) {
       <div class="stat"><div class="stat-label">Tonelaje</div><div class="stat-value">${fmtNum(Math.round(week.tonnage))}<small> kg</small></div></div>
       <div class="stat"><div class="stat-label">Series efectivas</div><div class="stat-value">${fmtNum(week.effective, 1)}</div></div>
       <div class="stat"><div class="stat-label">Reps</div><div class="stat-value">${week.reps}</div></div>
-      <div class="stat"><div class="stat-label">Tiempo</div><div class="stat-value">${week.minutes ? Math.round(week.minutes) : '—'}<small> min</small></div></div>
+      <div class="stat"><div class="stat-label">Récords</div><div class="stat-value">${records || '—'}</div></div>
       <div class="stat"><div class="stat-label">RIR medio</div><div class="stat-value">${week.avgRir == null ? '—' : fmtNum(week.avgRir, 1)}</div></div>
     </div>
 
@@ -49,7 +50,6 @@ export function render(ctx) {
 }
 
 function sessionCard(session) {
-  const t = sessionTotals(session);
   const prs = sessionPRs(session);
   return `
     <div class="card session-card" data-session="${esc(session.id)}">
@@ -68,7 +68,6 @@ function sessionCard(session) {
       ${prs.length ? `<div class="pr-inline">${icon('trophy')} ${prs.map((p) => `<span>${esc(p.name)} <b>${fmtNum(p.value, 1)} kg</b></span>`).join('')}</div>` : ''}
       <div class="log">${entryLines(session) || '<p class="muted">Sin series apuntadas.</p>'}</div>
       ${session.note ? `<p class="day-note">${icon('quote')} ${esc(session.note)}</p>` : ''}
-      ${t.duration ? `<p class="hint">${t.duration} min · ${fmtNum(t.density || 0)} kg/min</p>` : ''}
     </div>`;
 }
 
@@ -111,9 +110,9 @@ function openDetail(id) {
         </label>
         ${sessionSummary(s)}
         <div class="detail-grid">
+          <div><span class="muted">Series apuntadas</span><b>${t.done} de ${t.planned}</b></div>
           <div><span class="muted">Series efectivas</span><b>${fmtNum(t.effective, 1)}</b></div>
-          <div><span class="muted">Duración</span><b>${t.duration ? `${t.duration} min` : '—'}</b></div>
-          <div><span class="muted">Densidad</span><b>${t.density ? `${fmtNum(t.density)} kg/min` : '—'}</b></div>
+          <div><span class="muted">Reps</span><b>${t.reps}</b></div>
           <div><span class="muted">RIR medio</span><b>${t.avgRir == null ? '—' : fmtNum(t.avgRir, 1)}</b></div>
         </div>
         <label class="lbl">Sensación</label>

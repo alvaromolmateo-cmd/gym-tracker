@@ -9,6 +9,9 @@ import { fmtSet } from '../sets.js';
 import { historyOf } from '../store.js';
 import { muscleChip, emptyState } from './shared.js';
 
+// Escalones de carga habituales en el gimnasio, para no tener que teclearlos.
+const STEPS = [1.25, 2.5, 5, 10];
+
 export function render(ctx) {
   const st = getState();
   const filter = ctx.muscleFilter || 'all';
@@ -54,7 +57,7 @@ export function render(ctx) {
                 <span><small>1RM est.</small><b>${best?.e1rm ? `${fmtNum(best.e1rm.e1rm, 1)} kg` : '—'}</b></span>
                 <span><small>Salto</small><b>${fmtNum(inc.inc, 2)} kg</b></span>
               </div>
-              <div class="ex-profile">${esc(`${p.pct[0]}-${p.pct[1]} % por salto · ≈${p.weekly} %/semana`)}</div>
+              <div class="ex-profile">${esc(`${p.pct[0]}-${p.pct[1]} % por salto · ≈${fmtNum(p.weekly, 1)} %/semana`)}</div>
             </button>`;
         }).join('')}
       </div>` : emptyState('Ningún ejercicio con ese filtro.')}
@@ -103,11 +106,15 @@ function openExercise(id) {
             <select class="select" data-f="bw"><option value="0"${!ex.bw ? ' selected' : ''}>No</option><option value="1"${ex.bw ? ' selected' : ''}>Sí</option></select>
           </label>
         </div>
+        <div class="seg seg-wrap step-seg">
+          ${STEPS.map((v) => `<button class="seg-btn${Number(ex.step) === v ? ' on' : ''}" data-step="${v}">${fmtNum(v, 2)} kg</button>`).join('')}
+        </div>
+        <p class="hint">En poleas, máquinas de placas y lastre puedes colgar el disco de sobrecarga de 1,25 kg. En mancuernas y barras el escalón real no baja de 2,5 kg (los discos van de dos en dos).</p>
 
         <div class="profile-box">
           <div class="profile-head">${icon('target')} Sobrecarga progresiva para ${esc(muscleName(ex.muscle))}</div>
-          <p>Banda de subida <b>${p.pct[0]}-${p.pct[1]} %</b> por salto (ACSM 2009: menos en músculos pequeños, más en los grandes) · ritmo esperable <b>≈${p.weekly} %/semana</b> · referencia de volumen <b>${p.sets[0]}-${p.sets[1]} series/semana</b>.</p>
-          <p class="muted">Con el incremento de ${ex.step} kg, desde ${fmtNum(best?.weight?.weight || 50, 0)} kg el próximo escalón sería de ${fmtNum(increment(best?.weight?.weight || 50, ex).inc, 2)} kg (${fmtNum(increment(best?.weight?.weight || 50, ex).pct, 1)} %).</p>
+          <p>Banda de subida <b>${p.pct[0]}-${p.pct[1]} %</b> por salto (ACSM 2009: menos en músculos pequeños, más en los grandes) · ritmo esperable <b>≈${fmtNum(p.weekly, 1)} %/semana</b> · referencia de volumen <b>${p.sets[0]}-${p.sets[1]} series/semana</b>.</p>
+          <p class="muted">Con el incremento de ${fmtNum(ex.step, 2)} kg, desde ${fmtNum(best?.weight?.weight || 50, 0)} kg el próximo escalón sería de ${fmtNum(increment(best?.weight?.weight || 50, ex).inc, 2)} kg (${fmtNum(increment(best?.weight?.weight || 50, ex).pct, 1)} %).</p>
         </div>
 
         <label class="fld">Notas
@@ -146,6 +153,17 @@ function openExercise(id) {
           else patchExercise(id, { [field]: read() }, { silent: ev === 'input' && field !== 'muscle' });
         });
       });
+      panel.querySelectorAll('[data-step]').forEach((b) => b.addEventListener('click', () => {
+        const v = Number(b.dataset.step);
+        if (isNew) {
+          draft.step = v;
+          panel.querySelector('[data-f="step"]').value = v;
+          panel.querySelectorAll('[data-step]').forEach((x) => x.classList.toggle('on', Number(x.dataset.step) === v));
+        } else {
+          patchExercise(id, { step: v });
+        }
+      }));
+
       panel.querySelector('[data-ok]').addEventListener('click', () => {
         if (isNew) {
           if (!draft.name.trim()) {

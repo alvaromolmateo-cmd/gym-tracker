@@ -175,7 +175,7 @@ function exerciseChart(exId) {
       unit: 'kg', decimals: 1, height: 220, color: 'var(--series-1)',
     })}
     <div class="ex-foot">
-      <span class="muted">${esc(muscleName(ex.muscle))} · saltos de ${ex.step} kg · banda ${p.pct[0]}-${p.pct[1]} % · objetivo ≈${p.weekly} %/semana</span>
+      <span class="muted">${esc(muscleName(ex.muscle))} · saltos de ${fmtNum(ex.step, 2)} kg · banda ${p.pct[0]}-${p.pct[1]} % · objetivo ≈${fmtNum(p.weekly, 1)} %/semana</span>
     </div>
     ${dataTable(series.slice().reverse().map((s) => [shortDate(s.date), `${fmtNum(s.weight, 1)} kg`, String(s.reps), `${fmtNum(s.e1rm, 1)} kg`]), ['Fecha', 'Peso máx.', 'Reps', '1RM est.'])}`;
 }

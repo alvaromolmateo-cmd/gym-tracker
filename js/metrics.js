@@ -4,7 +4,7 @@
 import { getState, allSessions, exerciseById } from './store.js';
 import { addDays, parseKey, keyOf, todayKey } from './dates.js';
 import { entryTotals, setE1RM, setWeight, setReps, effectiveSets, setTonnage, hasData, num } from './sets.js';
-import { profileOf } from './catalog.js';
+import { profileOf, dropSteps, MYO_BLOCKS } from './catalog.js';
 import { weeklyChange } from './progression.js';
 
 // ---------- Semanas (lunes a domingo) ----------
@@ -61,10 +61,7 @@ export function sessionTotals(session) {
     }
   }
   out.avgRir = out.rirCount ? out.rirSum / out.rirCount : null;
-  out.duration = session.startedAt && session.endedAt
-    ? Math.max(0, Math.round((new Date(session.endedAt) - new Date(session.startedAt)) / 60000))
-    : null;
-  out.density = out.duration ? out.tonnage / out.duration : null;
+  // La duración no se calcula a propósito: es fácil olvidarse de cerrar el entreno y el dato mentiría.
   out.complete = out.planned ? (out.done / out.planned) * 100 : 0;
   return out;
 }
@@ -75,14 +72,13 @@ export const hasLog = (session) => sessionTotals(session).sets > 0;
 export function weekStats(monday) {
   const end = addDays(monday, 6);
   const sessions = allSessions().filter((s) => s.date >= monday && s.date <= end);
-  const agg = { monday, sessions: sessions.length, tonnage: 0, reps: 0, sets: 0, effective: 0, byMuscle: {}, minutes: 0, rirSum: 0, rirCount: 0 };
+  const agg = { monday, sessions: sessions.length, tonnage: 0, reps: 0, sets: 0, effective: 0, byMuscle: {}, rirSum: 0, rirCount: 0 };
   for (const s of sessions) {
     const t = sessionTotals(s);
     agg.tonnage += t.tonnage;
     agg.reps += t.reps;
     agg.sets += t.sets;
     agg.effective += t.effective;
-    agg.minutes += t.duration || 0;
     agg.rirSum += t.rirSum;
     agg.rirCount += t.rirCount;
     for (const [m, v] of Object.entries(t.byMuscle)) agg.byMuscle[m] = (agg.byMuscle[m] || 0) + v;
@@ -229,14 +225,22 @@ export function nextDay() {
 }
 
 // ---------- Resumen del día de rutina ----------
+// Series efectivas que supone un ejercicio de la rutina: el tramo inicial cuenta 1
+// y cada tramo extra de las técnicas troceadas, 0,5 (igual que al registrarlas).
+export function planSets(item) {
+  const sets = Math.max(1, item.sets || 1);
+  if (item.type === 'myo') return sets * (1 + MYO_BLOCKS * 0.5);
+  if (item.type === 'restpause') return sets * (1 + Math.max(0, (item.scheme?.length || 1) - 1) * 0.5);
+  if (item.type === 'dropset') return sets * (1 + Math.max(0, dropSteps(item).length - 1) * 0.5);
+  return sets;
+}
+
 export function dayVolume(day) {
   const byMuscle = {};
   let sets = 0;
   for (const item of day.items || []) {
     const ex = exerciseById(item.exerciseId);
-    const count = item.type === 'normal'
-      ? (item.sets || 1) + (item.extra?.count || 0)
-      : (item.sets || 1) * (item.type === 'myo' ? 2.5 : item.type === 'restpause' ? 1 + ((item.scheme?.length || 1) - 1) * 0.5 : 1 + ((item.dropScheme?.length || 1) - 1) * 0.5);
+    const count = planSets(item);
     sets += count;
     byMuscle[ex.muscle] = (byMuscle[ex.muscle] || 0) + count;
     for (const m of ex.secondary || []) byMuscle[m] = (byMuscle[m] || 0) + count * 0.5;

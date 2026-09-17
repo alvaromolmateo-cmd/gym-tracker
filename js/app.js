@@ -5,7 +5,6 @@ import { refreshModal, toast } from './ui.js';
 import { mountCharts } from './charts.js';
 import { todayKey } from './dates.js';
 import { mondayOf } from './metrics.js';
-import './timer.js';
 import * as train from './views/train.js';
 import * as history from './views/history.js';
 import * as routine from './views/routine.js';

@@ -99,17 +99,46 @@ export const isLegacyMyoDesc = (desc) => typeof desc === 'string' && desc.starts
 export const descOf = (item) => (item && item.desc != null ? item.desc : defaultDesc(item && item.type));
 
 // ---------- Tipos de serie ----------
+// `hint` es la explicación corta que se ve al elegir el tipo en la rutina.
 export const SET_TYPES = {
-  normal: { id: 'normal', label: 'Series normales', short: 'Normal', icon: 'list' },
-  myo: { id: 'myo', label: 'Myo-reps', short: 'Myo-reps', icon: 'zap' },
-  restpause: { id: 'restpause', label: 'Rest-pause', short: 'Rest-pause', icon: 'clock' },
-  dropset: { id: 'dropset', label: 'Drop set', short: 'Drop set', icon: 'arrow-down' },
+  normal: {
+    id: 'normal', label: 'Series normales', short: 'Normal', icon: 'list',
+    hint: 'Las de siempre: mismo peso en todas, reps dentro del rango y el RIR que marque el objetivo.',
+  },
+  myo: {
+    id: 'myo', label: 'Myo-reps', short: 'Myo-reps', icon: 'zap',
+    hint: `Activación al fallo, ${MYO_REST_FIRST}" y ${MYO_MINIS} mini-series con las reps de la tabla (${MYO_REST}" entre ellas), y una última al fallo.`,
+  },
+  restpause: {
+    id: 'restpause', label: 'Rest-pause', short: 'Rest-pause', icon: 'clock',
+    hint: 'Una sola serie troceada: haces la tanda, descansas unos segundos y sigues hasta completar el esquema.',
+  },
+  dropset: {
+    id: 'dropset', label: 'Drop set', short: 'Drop set', icon: 'arrow-down',
+    hint: 'Cada serie es una cascada: llegas al tope, bajas el peso y sigues sin descanso hasta el último escalón.',
+  },
 };
 
 export const typeLabel = (t) => SET_TYPES[t]?.short || 'Normal';
 
+// Escalones de un drop set: los del esquema y, si se pide, el último al fallo.
+export const dropSteps = (plan) => [...((plan && plan.dropScheme) || []), ...(plan && plan.dropFail ? ['fallo'] : [])];
+
+// Prescripción de partida al añadir un ejercicio de cada tipo.
+// Un sitio único para que la rutina y el «ejercicio suelto» del entreno empiecen igual.
+export function defaultPlan(type = 'normal') {
+  switch (type) {
+    case 'myo': return { type, sets: 1 };
+    case 'restpause': return { type, sets: 1, scheme: [10, 10, 10], clusterRest: 20 };
+    case 'dropset': return { type, sets: 2, dropScheme: [6, 8], dropPct: 20, dropFail: true };
+    default: return { type, sets: 3, repsMin: 8, repsMax: 10, rir: '0-1', rirMax: 1 };
+  }
+}
+
 // ---------- Biblioteca de ejercicios ----------
 // step: incremento mínimo real disponible en el gimnasio (kg). Manda sobre el del perfil.
+//       1,25 kg en poleas, máquinas de placas y lastre (basta con colgar el disco de sobrecarga);
+//       en mancuernas y barras no baja de 2,5 kg porque no hay medio escalón que poner.
 // bw:   el peso corporal forma parte de la carga (fondos, dominadas…).
 const EXERCISES = [
   ['curl-femoral', 'Curl femoral', 'femoral', 'Máquina', 5, { secondary: ['gluteo'] }],
@@ -123,23 +152,23 @@ const EXERCISES = [
   ['sentadilla-bulgara', 'Sentadilla búlgara', 'cuadriceps', 'Multipower', 5, { secondary: ['gluteo'] }],
   ['hip-thrust', 'Hip thrust', 'gluteo', 'Barra', 10, { secondary: ['femoral'] }],
   ['peso-muerto-rumano', 'Peso muerto rumano con mancuernas', 'femoral', 'Mancuernas', 2.5, { secondary: ['gluteo'] }],
-  ['abdominales-polea', 'Abdominales en polea', 'abdomen', 'Polea', 2.5],
+  ['abdominales-polea', 'Abdominales en polea', 'abdomen', 'Polea', 1.25],
 
   ['press-militar-mancuerna', 'Press militar con mancuernas', 'hombro', 'Mancuernas', 2.5, { secondary: ['triceps'] }],
   ['laterales-mancuerna', 'Laterales con mancuernas (eje lateral)', 'lateral', 'Mancuernas', 2.5],
-  ['laterales-polea', 'Laterales en polea con muñequeras (eje escapular)', 'lateral', 'Polea', 2.5],
-  ['posterior-polea', 'Posterior en polea', 'posterior', 'Polea', 2.5],
-  ['curl-biceps-polea', 'Curl de bíceps en polea a una mano con banco', 'biceps', 'Polea', 2.5],
+  ['laterales-polea', 'Laterales en polea con muñequeras (eje escapular)', 'lateral', 'Polea', 1.25],
+  ['posterior-polea', 'Posterior en polea', 'posterior', 'Polea', 1.25],
+  ['curl-biceps-polea', 'Curl de bíceps en polea a una mano con banco', 'biceps', 'Polea', 1.25],
   ['curl-biceps-inclinado', 'Curl bíceps inclinado con mancuerna', 'biceps', 'Mancuernas', 2.5],
-  ['triceps-cruzado', 'Extensión de tríceps cruzado', 'triceps', 'Polea', 2.5],
-  ['triceps-barra', 'Extensión de tríceps con barra W', 'triceps', 'Polea', 2.5],
+  ['triceps-cruzado', 'Extensión de tríceps cruzado', 'triceps', 'Polea', 1.25],
+  ['triceps-barra', 'Extensión de tríceps con barra W', 'triceps', 'Polea', 1.25],
   ['jalon', 'Jalón agarre neutro', 'espalda', 'Polea', 5, { secondary: ['biceps'] }],
   ['remo-polea-alta', 'Máquina de remo alto', 'espalda', 'Máquina', 5, { secondary: ['posterior'] }],
   ['remo-t', 'Remo T agarre cerrado', 'espalda', 'Barra', 5, { secondary: ['biceps'] }],
   ['pull-over', 'Pull over con mancuerna', 'espalda', 'Mancuernas', 2.5, { secondary: ['pecho'] }],
-  ['press-pectoral-maquina', 'Press pectoral en máquina', 'pecho', 'Máquina', 2.5, { secondary: ['triceps'] }],
+  ['press-pectoral-maquina', 'Press pectoral en máquina', 'pecho', 'Máquina', 1.25, { secondary: ['triceps'] }],
   ['press-inclinado-mancuernas', 'Press inclinado con mancuernas', 'pecho', 'Mancuernas', 2.5, { secondary: ['hombro', 'triceps'] }],
-  ['fondos', 'Fondos', 'pecho', 'Peso corporal', 2.5, { secondary: ['triceps'], bw: true }],
+  ['fondos', 'Fondos', 'pecho', 'Peso corporal', 1.25, { secondary: ['triceps'], bw: true }],
 ];
 
 export const EQUIPMENT = ['Máquina', 'Polea', 'Mancuernas', 'Barra', 'Multipower', 'Peso corporal', 'Otro'];

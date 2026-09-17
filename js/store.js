@@ -3,12 +3,25 @@
 
 import { uid } from './ui.js';
 import { todayKey } from './dates.js';
-import { defaultExercises, isLegacyMyoDesc } from './catalog.js';
+import { defaultExercises, isLegacyMyoDesc, defaultPlan } from './catalog.js';
 import { emptySet } from './sets.js';
 import { ROUTINE_DAYS, ROUTINE_START, SEED_SESSIONS } from './seed.js';
 
 const STORAGE_KEY = 'plataforma-entrenamientos:data';
-export const DATA_VERSION = 2;
+export const DATA_VERSION = 3;
+
+// v3: en el gimnasio hay discos de sobrecarga de 1,25 kg, así que en poleas, máquinas de placas
+// y lastre el escalón mínimo real es ese y no 2,5 kg. Solo se corrige si seguía en el valor viejo.
+const STEP_V3 = {
+  'abdominales-polea': 1.25,
+  'laterales-polea': 1.25,
+  'posterior-polea': 1.25,
+  'curl-biceps-polea': 1.25,
+  'triceps-cruzado': 1.25,
+  'triceps-barra': 1.25,
+  'press-pectoral-maquina': 1.25,
+  fondos: 1.25,
+};
 
 export const DEFAULT_SETTINGS = {
   name: '',
@@ -94,6 +107,7 @@ export function defaultState() {
 // ---------- Migración / saneado ----------
 function migrate(data) {
   if (!data || typeof data !== 'object') throw new Error('Formato no válido');
+  const from = Number(data.version) || 1;
   const out = { ...defaultState(), ...data };
   out.version = DATA_VERSION;
 
@@ -111,6 +125,12 @@ function migrate(data) {
     }))
     : defaultExercises();
 
+  if (from < 3) {
+    for (const e of out.exercises) {
+      if (STEP_V3[e.id] && e.step === 2.5) e.step = STEP_V3[e.id];
+    }
+  }
+
   const r = data.routine;
   out.routine = r && Array.isArray(r.days) && r.days.length
     ? {
@@ -122,9 +142,13 @@ function migrate(data) {
         name: d.name || 'Día',
         focus: d.focus || '',
         // v2: los ejercicios de la rutina ya no guardan descanso cronometrado ni serie extra.
-        items: (Array.isArray(d.items) ? d.items : []).map(({ rest, extra, ...it }) => ({
+        // v3: `dropSets` desaparece — el número de series de un drop set es `sets`, como en el resto.
+        items: (Array.isArray(d.items) ? d.items : []).map(({ rest, extra, dropSets, ...it }) => ({
           ...it,
           id: it.id || uid(),
+          ...(it.type === 'dropset' ? { sets: Math.max(Number(it.sets) || 1, Number(dropSets) || 1) } : {}),
+          // El remo T son 2 series de 6→8, sin escalón extra al fallo (corrección del usuario).
+          ...(from < 3 && it.type === 'dropset' && it.exerciseId === 'remo-t' ? { dropFail: false } : {}),
           ...(isLegacyMyoDesc(it.desc) ? { desc: null } : {}),
         })),
       })),
@@ -280,7 +304,8 @@ export function addEntry(sessionId, exerciseId, type = 'normal') {
   update((st) => {
     const s = st.sessions[sessionId];
     if (!s) return;
-    const plan = { exerciseId, type, sets: 3, repsMin: 8, repsMax: 10, rir: '0-1', rirMax: 1 };
+    // Mismo punto de partida que en la rutina, para que un myo-reps suelto no salga como 3 series normales.
+    const plan = { exerciseId, ...defaultPlan(type) };
     s.entries.push({ id: uid(), exerciseId, type, plan, note: '', sets: plannedSets(plan) });
   });
 }
@@ -359,16 +384,17 @@ export function moveDay(dayId, dir) {
 }
 
 export function addItem(dayId, exerciseId, type = 'normal') {
+  const id = uid();
   update((st) => {
     const d = st.routine.days.find((x) => x.id === dayId);
     if (!d) return;
     d.items.push({
-      id: uid(), exerciseId, type, sets: type === 'normal' ? 3 : 1,
-      repsMin: 8, repsMax: 10, rir: '0-1', rirMax: 1, note: '',
-      ...(type === 'restpause' ? { scheme: [10, 10, 10], clusterRest: 20 } : {}),
-      ...(type === 'dropset' ? { dropScheme: [6, 8], dropSets: 2, dropPct: 20, dropFail: true } : {}),
+      id, exerciseId, note: '',
+      repsMin: 8, repsMax: 10, rir: '0-1', rirMax: 1, // quedan guardados por si luego se pasa a series normales
+      ...defaultPlan(type),
     });
   });
+  return id;
 }
 
 export function patchItem(dayId, itemId, patch, opts) {

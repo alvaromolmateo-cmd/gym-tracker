@@ -16,8 +16,8 @@ const myo = (exerciseId, opts = {}) => ({ exerciseId, type: 'myo', sets: 1, ...o
 const rp = (exerciseId, scheme, clusterRest, opts = {}) => ({
   exerciseId, type: 'restpause', sets: 1, scheme, clusterRest, ...opts,
 });
-const drop = (exerciseId, dropScheme, dropSets, dropPct, opts = {}) => ({
-  exerciseId, type: 'dropset', sets: dropSets, dropScheme, dropFail: true, dropPct, ...opts,
+const drop = (exerciseId, dropScheme, sets, dropPct, opts = {}) => ({
+  exerciseId, type: 'dropset', sets, dropScheme, dropFail: true, dropPct, ...opts,
 });
 
 export const ROUTINE_DAYS = [
@@ -53,7 +53,7 @@ export const ROUTINE_DAYS = [
       n('triceps-cruzado', 3, 8, 10, 'fallo', 0, { tempo: 'reps lentas' }),
       n('jalon', 2, 5, 7, '1', 1),
       n('remo-polea-alta', 3, 8, 8, '0', 0),
-      drop('remo-t', [6, 8], 2, 25),
+      drop('remo-t', [6, 8], 2, 25, { dropFail: false }), // 2 series de 6→8, sin escalón extra al fallo
       n('pull-over', 2, 6, 8, '0', 0, { tempo: 'máximo estiramiento' }),
     ],
   },

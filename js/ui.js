@@ -53,9 +53,15 @@ export function closeModal() {
 function drawModal(keepScroll = false) {
   const host = document.getElementById('modal');
   const prev = keepScroll ? panelEl()?.querySelector('.modal-body')?.scrollTop : 0;
+  // Si lo que se estaba editando ha desaparecido (importación, reinicio, borrado), la ficha se cierra.
+  const html = modal.render();
+  if (!html) {
+    closeModal();
+    return;
+  }
   host.innerHTML = `
     <div class="modal-backdrop" data-close></div>
-    <div class="modal-panel ${modal.size || ''}" role="dialog" aria-modal="true">${modal.render()}</div>`;
+    <div class="modal-panel ${modal.size || ''}" role="dialog" aria-modal="true">${html}</div>`;
   document.body.classList.add('modal-open');
   host.querySelector('[data-close]').addEventListener('click', closeModal);
   host.querySelectorAll('[data-modal-close]').forEach((b) => b.addEventListener('click', closeModal));

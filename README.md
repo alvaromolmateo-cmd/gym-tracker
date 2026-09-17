@@ -16,7 +16,11 @@ en el dispositivo (`localStorage`), funciona sin cobertura y se puede exportar a
 ### Entreno
 La vista principal. Propone el día que toca, y dentro de cada ejercicio muestra:
 
-- **La prescripción** tal cual la puso el entrenador: series, reps, RIR, tempo, descripción y notas.
+- **La prescripción en fichas**: el nombre del ejercicio con su técnica al lado (myo-reps,
+  rest-pause o drop set) y debajo, en fichas sueltas, lo que toca hacer — series / reps / RIR en las
+  normales, y lo suyo en cada técnica: tandas y descanso en un rest-pause, escalones y % de bajada
+  en un drop set, activación y mini-series en unas myo-reps. El tempo y las notas solo salen si las
+  has escrito.
 - **Qué hacer hoy**: peso y reps sugeridos por el motor de progresión, con el motivo explicado.
 - **La última vez**: lo que levantaste, con tus anotaciones, y un botón para copiar los pesos.
 - **Las casillas para apuntar**, adaptadas al tipo de serie (normales, myo-reps, rest-pause, drop set).
@@ -26,13 +30,18 @@ La vista principal. Propone el día que toca, y dentro de cada ejercicio muestra
 myo-reps, y ahí la app se limita a recordarte los 40" y los 20"; no hay temporizador que mirar en
 mitad de la serie.
 
+**Sin reloj de sesión tampoco**: es fácil olvidarse de cerrar el entreno y el tiempo acabaría
+mintiendo. Lo que se mide, en la cabecera y al terminar, es **reps · series · tonelaje**.
+
 ### Historial
 Una semana por pantalla, con sus cuatro días, todo lo levantado, los récords del día y tus notas.
 Se puede retomar, editar la fecha o borrar cualquier entreno.
 
 ### Rutina
-La planificación actual, editable. Cambias series, reps, RIR, tempo, esquemas, el tipo de serie o el
-**texto descriptivo de cada ejercicio** y sale reflejado en el siguiente entreno. Muestra el volumen
+La planificación actual, editable, con las mismas fichas que el entreno. Tocas cualquier ejercicio y
+se abre su ficha: **selector de técnica** (cada una con sus campos propios), series, reps o esquema,
+RIR, tempo, nota y **texto descriptivo**, con una **vista previa en vivo** de cómo se verá en el
+entreno — así no hay forma de confundir «2 series de 6→8» con «3 escalones». Muestra el volumen
 semanal planificado por grupo muscular.
 
 ### Progreso
@@ -41,7 +50,17 @@ frente al objetivo teórico de cada grupo, 1RM estimado por ejercicio, récords 
 
 ### Ejercicios
 La biblioteca, con el grupo muscular, el material, el **incremento mínimo real** que hay en tu
-gimnasio para ese ejercicio, el perfil de progresión que le corresponde y su histórico.
+gimnasio para ese ejercicio (elegible de un toque entre 1,25 / 2,5 / 5 / 10 kg), el perfil de
+progresión que le corresponde y su histórico.
+
+En poleas, máquinas de placas y lastre el escalón es de **1,25 kg** —basta con colgar el disco de
+sobrecarga—, y eso permite subir laterales, tríceps o curl en polea sin pegar saltos del 8 %. En
+mancuernas y barras se queda en 2,5 kg, que es lo que de verdad se puede poner.
+
+### Ajustes
+Preferencias, copia de seguridad y la letra pequeña: cómo calcula la app la sobrecarga progresiva,
+qué son y cómo se cuentan las **myo-reps, el rest-pause y los drop sets**, las series efectivas y el
+1RM estimado, y una sección de **referencias** con lo que aporta cada una.
 
 ---
 
@@ -69,6 +88,10 @@ muscular**.
   agrupadas producen adaptaciones **comparables a las series tradicionales** cuando se igualan
   volumen y esfuerzo; su ventaja es la eficiencia de tiempo. Por eso aquí cuentan como volumen
   efectivo, pero no como series completas.
+- **Prestes et al. (2019), _J Strength Cond Res_.** Rest-pause frente a series tradicionales en
+  sujetos entrenados: mismo trabajo en menos tiempo y más repeticiones cerca del fallo.
+- **Schoenfeld y Grgic (2018), _Strength and Conditioning Journal_; Fink et al. (2018).** Los drop
+  sets suman volumen efectivo en menos tiempo; de ahí que cada escalón extra cuente media serie.
 
 ### Perfil por grupo muscular
 
@@ -110,6 +133,20 @@ no carga.
 
 ---
 
+## Técnicas especiales
+
+Cada técnica se apunta con las casillas que le corresponden, y en la rutina se edita con sus propios
+campos:
+
+| Técnica | Qué se prescribe | Qué se apunta | Cuándo sube la carga |
+|---|---|---|---|
+| **Myo-reps** | nada: la secuencia es fija | peso, activación y cada tramo | activación por encima de 12 reps |
+| **Rest-pause** | esquema de tandas (8+5+5+3…) y descanso entre ellas | peso y reps de cada tanda, con el total en vivo | se completa el total del esquema |
+| **Drop set** | escalones de reps (6→8), nº de series, % de bajada y si el último va al fallo | peso y reps de cada escalón, con la cascada sugerida | se cumplen las reps del primer escalón |
+
+Ojo con los drop sets: **«2 × (6 → 8)» son 2 series**, cada una con dos escalones. Los escalones no
+son series, y por eso la app los enseña como «Serie 1 de 2» con sus escalones dentro.
+
 ## Myo-reps
 
 Secuencia del entrenador, siempre la misma:
@@ -143,7 +180,6 @@ por encima de 20, de que es demasiado ligero.
   fiabilidad. En myo-reps y rest-pause se toma la serie de activación, que va al fallo. Es un
   indicador de tendencia, no una marca real.
 - **Progresión real**: cambio semanal medio del 1RM estimado, comparado con el objetivo del grupo.
-- **Densidad**: tonelaje entre minutos de sesión.
 - **Racha**: semanas seguidas completando todos los días de la rutina.
 
 ---
@@ -154,9 +190,9 @@ La app viene con la **planificación actual** (los 4 días del Excel del entrena
 con la **semana 2 (24-30/8/2026) ya registrada**, para que el motor de progresión tenga referencias
 desde el primer entreno.
 
-Los días de la semana de esos cuatro entrenos (lunes, martes, jueves y viernes) y su duración
-(90 min) son una suposición: se pueden corregir desde Historial → detalle. La semana 1 se toma como
-la del 17/8/2026, que es lo que hace que el 24/8 sea la semana 2.
+Los días de la semana de esos cuatro entrenos (lunes, martes, jueves y viernes) son una suposición:
+se pueden corregir desde Historial → detalle. La semana 1 se toma como la del 17/8/2026, que es lo
+que hace que el 24/8 sea la semana 2.
 
 ---
 
@@ -173,7 +209,6 @@ js/
   sets.js             matemática de las series: reps, tonelaje, series efectivas, 1RM
   progression.js      motor de sobrecarga progresiva
   metrics.js          agregados: semanas, volumen por grupo, récords, adherencia
-  timer.js            cronómetro de sesión
   charts.js           gráficas SVG a mano
   ui.js               escape, iconos, formato, modal y avisos
   views/              entreno, historial, rutina, progreso, ejercicios, ajustes

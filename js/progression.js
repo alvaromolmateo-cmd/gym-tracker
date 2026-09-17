@@ -15,6 +15,7 @@
 
 import { profileOf, myoPlan, muscleName, MYO_TARGET } from './catalog.js';
 import { num, setReps, setWeight, leadReps } from './sets.js';
+import { fmtNum } from './ui.js';
 
 export const roundToStep = (w, step) => (step > 0 ? Math.round(w / step) * step : Math.round(w));
 
@@ -32,7 +33,7 @@ export function increment(weight, exercise) {
 export function profileSummary(exercise) {
   const p = profileOf(exercise.muscle);
   const step = exercise.step || p.step;
-  return `saltos de ${step} kg · banda ${p.pct[0]}-${p.pct[1]} % · objetivo ≈${p.weekly} %/semana`;
+  return `saltos de ${fmtNum(step, 2)} kg · banda ${p.pct[0]}-${p.pct[1]} % · objetivo ≈${fmtNum(p.weekly, 1)} %/semana`;
 }
 
 export const weeklyTarget = (muscle) => profileOf(muscle).weekly;
@@ -188,8 +189,11 @@ export function suggest({ exercise, plan, history = [] }) {
 // ---------- Pesos sugeridos para un drop set ----------
 export function dropWeights(top, exercise, steps, pct = 15) {
   const step = exercise.step || 2.5;
+  const first = num(top);
+  // Sin un peso de partida no hay cascada que sugerir: mejor dejar las casillas en blanco.
+  if (first == null || first <= 0) return Array.from({ length: steps }, () => null);
   const out = [];
-  let w = num(top) || 0;
+  let w = first;
   for (let i = 0; i < steps; i += 1) {
     out.push(w);
     w = Math.max(step, roundToStep(w * (1 - pct / 100), step));
