@@ -185,7 +185,7 @@ function openItem(dayId, itemId) {
           <label class="fld">Reps máx. <input class="input" type="number" min="1" value="${item.repsMax ?? 10}" data-f="repsMax"></label>
           <label class="fld">RIR <input class="input" type="text" placeholder="0-1" value="${esc(item.rir || '')}" data-f="rir"></label>
         </div>
-        <label class="fld">Reps encadenadas (texto libre)
+        <label class="fld">Reps encadenadas en texto libre
           <input class="input" type="text" placeholder="p. ej. 7+6" value="${esc(item.repsText || '')}" data-f="repsText">
         </label>
         <p class="hint">Para series seguidas dentro de la misma serie: «7+6» son 7 reps lentas y 6 normales sin soltar el peso. Si lo rellenas, manda sobre el rango.</p>
@@ -199,17 +199,17 @@ function openItem(dayId, itemId) {
         <label class="fld">Esquema de reps
           <input class="input" type="text" value="${esc((item.scheme || []).join(' + '))}" data-f="scheme">
         </label>
-        <p class="hint">Reps de cada tanda dentro de la misma serie, separadas por «+» (p. ej. 8 + 5 + 5 + 3 + 3 + 3 + 3).</p>
-        <label class="fld">Descanso entre tandas (segundos)
+        <p class="hint">Reps de cada tanda dentro de la misma serie, separadas por «+», por ejemplo 8 + 5 + 5 + 3 + 3 + 3 + 3.</p>
+        <label class="fld">Descanso entre tandas en segundos
           <input class="input" type="number" min="5" max="60" value="${item.clusterRest ?? 15}" data-f="clusterRest">
         </label>`,
       dropset: `
         <label class="fld">Escalones de reps
           <input class="input" type="text" value="${esc((item.dropScheme || []).join(' → '))}" data-f="dropScheme">
         </label>
-        <p class="hint">Reps objetivo en cada bajada de peso, de más pesado a más ligero (p. ej. 6 → 8). Son escalones de la misma serie, no series distintas.</p>
+        <p class="hint">Reps objetivo en cada bajada de peso, de más pesado a más ligero, por ejemplo 6 → 8. Son escalones de la misma serie, no series distintas.</p>
         <div class="form-row">
-          <label class="fld">Bajada de peso (%)
+          <label class="fld">Bajada de peso en %
             <input class="input" type="number" min="5" max="40" value="${item.dropPct ?? 15}" data-f="dropPct">
           </label>
           <div class="fld">Último escalón al fallo
@@ -237,7 +237,7 @@ function openItem(dayId, itemId) {
 
         ${typeFields[item.type] ?? typeFields.normal}
 
-        <h3 class="sub-h">${icon('quote')} Anotaciones (opcionales)</h3>
+        <h3 class="sub-h">${icon('quote')} Anotaciones opcionales</h3>
         <label class="fld">Tempo
           <input class="input" type="text" placeholder='3" de bajada + 1" isométrico' value="${esc(item.tempo || '')}" data-f="tempo">
         </label>

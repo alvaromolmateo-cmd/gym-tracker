@@ -72,7 +72,7 @@ function renderStart(ctx) {
       <ol class="preview-list">
         ${day.items.map((item) => {
           const ex = exerciseById(item.exerciseId);
-          const last = historyOf(item.exerciseId, { type: item.type })[0];
+          const last = historyOf(item.exerciseId, { type: item.type, dayId: day.id, itemId: item.id })[0];
           return `
             <li>
               <span class="preview-name">${esc(ex.name)}${typeChip(item.type)}</span>
@@ -140,11 +140,27 @@ function renderSession(ctx, session) {
   `;
 }
 
+// Con qué se compara cada ejercicio: la misma técnica y, si lo hay, el mismo día de la rutina.
+const entryHistory = (session, entry) => historyOf(entry.exerciseId, {
+  before: session.date,
+  excludeSession: session.id,
+  type: entry.type,
+  dayId: session.dayId,
+  itemId: entry.plan?.id,
+});
+
+// Aviso cuando no hay nada con que comparar: si el ejercicio sí se ha hecho con otra técnica,
+// se dice, para que no parezca que se ha perdido el historial.
+function noHistoryText(session, entry) {
+  const other = historyOf(entry.exerciseId, { before: session.date, excludeSession: session.id }).length > 0;
+  return other ? 'Sin registros previos con esta técnica.' : 'Sin registros previos.';
+}
+
 function renderEntry(session, entry, index, open) {
   const ex = exerciseById(entry.exerciseId);
   const load = loadOf(ex);
   const t = entryTotals(entry, load);
-  const history = historyOf(entry.exerciseId, { before: session.date, excludeSession: session.id, type: entry.type });
+  const history = entryHistory(session, entry);
   const last = history[0];
   const tip = suggest({ exercise: ex, plan: entry.plan, history });
 
@@ -172,17 +188,19 @@ function renderEntry(session, entry, index, open) {
 
           <div class="entry-cols">
             <div class="tip-box tip-${esc(tip.action)}">
-              <div class="tip-head">${icon('target')} Hoy${tip.weight != null ? `: <b>${esc(fmtWeight(tip.weight, ex.bw))}</b>` : ''}${tip.reps ? ` × <b>${tip.reps}</b>` : ''}</div>
+              <div class="tip-head">${icon('target')} Hoy${tip.weight != null
+                ? `: <b>${esc(fmtWeight(tip.weight, ex.bw))}</b>${tip.reps ? ` × <b>${tip.reps}</b>` : ''}`
+                : (tip.reps ? `: <b>${tip.reps} reps</b>` : '')}</div>
               <p>${esc(tip.reason)}</p>
               ${tip.weight != null ? `<button class="btn sm" data-use-tip="${esc(entry.id)}" data-w="${tip.weight}">Usar en todas las series</button>` : ''}
             </div>
             <div class="last-box">
-              <div class="last-head">${icon('archive')} Última vez${last ? ` · <span class="muted">${esc(last.date.slice(8, 10))}/${esc(last.date.slice(5, 7))}</span>` : ''}</div>
+              <div class="last-head">${icon('archive')} Última vez${last ? ` · <span class="muted">${esc(last.date.slice(8, 10))}/${esc(last.date.slice(5, 7))}${last.otherDay ? ` · ${esc(last.dayName)}` : ''}</span>` : ''}</div>
               ${last
                 ? `<div class="last-sets">${last.sets.filter((s) => hasData(s, last.type)).map((s) => `<span>${esc(fmtSet(s, last.type, { bw: ex.bw }))}</span>`).join('')}</div>
                    ${last.note ? `<p class="last-note">${esc(last.note)}</p>` : ''}
                    <button class="btn sm" data-copy-last="${esc(entry.id)}">Copiar pesos</button>`
-                : '<p class="muted">Sin registros previos.</p>'}
+                : `<p class="muted">${noHistoryText(session, entry)}</p>`}
             </div>
           </div>
 
@@ -426,12 +444,12 @@ export function mount(root, ctx) {
       }
     });
     patchSession(session.id, {});
-    toast(`Cargado ${fmtNum(w, 1)} kg en todas las series`);
+    toast(`Cargado ${fmtNum(w, 2)} kg en todas las series`);
   }));
 
   root.querySelectorAll('[data-copy-last]').forEach((b) => b.addEventListener('click', () => {
     const entry = session.entries.find((e) => e.id === b.dataset.copyLast);
-    const last = historyOf(entry.exerciseId, { before: session.date, excludeSession: session.id, type: entry.type })[0];
+    const last = entryHistory(session, entry)[0];
     if (!last) return;
     entry.sets.forEach((set, i) => {
       const src = last.sets[i];

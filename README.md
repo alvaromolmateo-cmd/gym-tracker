@@ -23,6 +23,8 @@ La vista principal. Propone el día que toca, y dentro de cada ejercicio muestra
   has escrito.
 - **Qué hacer hoy**: peso y reps sugeridos por el motor de progresión, con el motivo explicado.
 - **La última vez**: lo que levantaste, con tus anotaciones, y un botón para copiar los pesos.
+  Siempre con la misma técnica y, si lo hay, del mismo día de la rutina (ver
+  [Con qué se compara cada ejercicio](#con-qué-se-compara-cada-ejercicio)).
 - **Las casillas para apuntar**, adaptadas al tipo de serie (normales, myo-reps, rest-pause, drop set).
 - **Anotaciones** por ejercicio y nota del día al cerrar, como en la libreta de siempre.
 
@@ -58,9 +60,10 @@ sobrecarga—, y eso permite subir laterales, tríceps o curl en polea sin pegar
 mancuernas y barras se queda en 2,5 kg, que es lo que de verdad se puede poner.
 
 ### Ajustes
-Preferencias, copia de seguridad y la letra pequeña: cómo calcula la app la sobrecarga progresiva,
-qué son y cómo se cuentan las **myo-reps, el rest-pause y los drop sets**, las series efectivas y el
-1RM estimado, y una sección de **referencias** con lo que aporta cada una.
+Preferencias, la tarjeta **Aplicación** (versión instalada y cómo instalarla en el móvil), copia de
+seguridad y la letra pequeña: cómo calcula la app la sobrecarga progresiva, con qué se compara cada
+ejercicio, qué son y cómo se cuentan las **myo-reps, el rest-pause y los drop sets**, las series
+efectivas y el 1RM estimado, y una sección de **referencias** con lo que aporta cada una.
 
 ---
 
@@ -78,6 +81,10 @@ muscular**.
   <https://pubmed.ncbi.nlm.nih.gov/19204579/>
 - **Regla 2×2 (NSCA, _Essentials of Strength Training and Conditioning_).** Esa condición debe
   cumplirse en **dos sesiones seguidas** antes de subir carga.
+- **Simão et al. (2012), _Sports Medicine_, «Exercise order in resistance training».** Un ejercicio
+  rinde menos repeticiones cuando va al final de la sesión que cuando va al principio. Por eso cada
+  ejercicio se compara con lo que hiciste en el mismo día de la rutina.
+  <https://pubmed.ncbi.nlm.nih.gov/22292516/>
 - **Nunes et al. (2023), PLOS ONE.** En personas ya entrenadas el **tren inferior progresa más
   rápido por semana** que el superior. Por eso el objetivo semanal no es el mismo en una prensa que
   en unos laterales. <https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0284216>
@@ -105,18 +112,35 @@ muscular**.
 | Espalda | 3-6 % | 2,5-5 kg | ≈1,2 % | 12-20 |
 | Abdomen | 3-6 % | 2,5 kg | ≈1,0 % | 8-16 |
 | Pecho | 2,5-5 % | 2,5 kg | ≈1,0 % | 10-18 |
-| Hombro (anterior) | 2-4 % | 2,5 kg | ≈0,8 % | 8-16 |
+| Hombro anterior | 2-4 % | 2,5 kg | ≈0,8 % | 8-16 |
 | Tríceps | 2-4 % | 2,5 kg | ≈0,8 % | 10-18 |
 | Bíceps | 2-4 % | 1,25-2,5 kg | ≈0,7 % | 10-18 |
-| Deltoides lateral / posterior | 1-3 % | 1-2,5 kg | ≈0,6 % | 10-20 |
+| Hombro lateral / posterior | 1-3 % | 1-2,5 kg | ≈0,6 % | 10-20 |
 
 ### El caso interesante: cuando el material no te deja
 
 En unos laterales de 12,5 kg el siguiente par de mancuernas son 15 kg: un salto del **20 %**, muy por
-encima del 1-3 % que le toca a un deltoides lateral. Ahí la app **no sube el peso**: te dice que
+encima del 1-3 % que le toca al hombro lateral. Ahí la app **no sube el peso**: te dice que
 repitas carga y sumes repeticiones, y solo propone el salto cuando encadenas dos sesiones cumpliendo
 el objetivo (regla 2×2) o sacas dos repeticiones de más. Lo mismo pasa con el press inclinado con
 mancuernas o el press de pecho en máquina.
+
+### Con qué se compara cada ejercicio
+
+Cada sugerencia sale de la **última vez que hiciste ese ejercicio con la misma técnica y en el mismo
+día de la rutina**:
+
+- **Misma técnica.** Unas myo-reps solo se comparan con myo-reps y un drop set con drop sets. Si la
+  extensión de cuádriceps va en drop set el día de cuádriceps y en myo-reps el de femoral, cada día
+  progresa con lo suyo y la información de una técnica no se cuela en la otra.
+- **Mismo día.** Aunque la técnica coincida, no rinde igual un ejercicio al principio del entreno que
+  al final con toda la fatiga encima (Simão et al., 2012). Unas laterales que van segundas en «Brazo
+  + Espalda» y últimas en «Brazo + Pecho» llevan cada una su propia progresión; mezclarlas haría que
+  la sugerencia fuese en zigzag, pidiéndote de más el día cansado y de menos el día fresco.
+- **Si en ese día aún no lo has hecho** (un ejercicio recién añadido, o un día nuevo), se toma como
+  referencia la última vez con la misma técnica en otro día, avisando de cuál. Solo sirve para
+  arrancar con ese peso: desde ese entreno ya se compara con su propio día.
+- Un ejercicio que se quedó sin apuntar no cuenta como «la última vez».
 
 ### Criterio de «listo para subir» según el tipo de serie
 
@@ -216,7 +240,7 @@ css/styles.css        tokens de diseño, componentes y responsive
 js/
   app.js              enrutado por hash, tema, service worker, instalación
   catalog.js          grupos musculares, perfiles de progresión, tabla de myo-reps, ejercicios
-  seed.js             planificación actual y registro de la semana 2
+  seed.js             rutina de ejemplo y detección del historial de ejemplo antiguo
   store.js            estado y persistencia (única capa que toca localStorage)
   sets.js             matemática de las series: reps, tonelaje, series efectivas, 1RM
   progression.js      motor de sobrecarga progresiva
@@ -240,7 +264,8 @@ python -m http.server 5177
 node tools/make-icons.js
 ```
 
-Al cambiar cualquier archivo de la lista `ASSETS`, sube `VERSION` en `sw.js` para que el service
+Al cambiar cualquier archivo de la lista `ASSETS`, sube `VERSION` en `sw.js` (y la misma cifra en
+`APP_VERSION`, en `js/views/settings.js`, que es la que se ve en Ajustes) para que el service
 worker sirva la versión nueva.
 
 ---

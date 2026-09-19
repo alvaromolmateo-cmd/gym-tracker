@@ -29,11 +29,17 @@ export function increment(weight, exercise) {
   return { inc, step, pct, band: [lo, hi], oversized: pct > hi + 0.01 };
 }
 
+// Banda de subida de un grupo muscular, con coma decimal: «2,5-5 %».
+export function bandText(muscle) {
+  const [lo, hi] = profileOf(muscle).pct;
+  return `${fmtNum(lo, 1)}-${fmtNum(hi, 1)} %`;
+}
+
 // Texto corto del perfil de un ejercicio, para mostrarlo en la ficha.
 export function profileSummary(exercise) {
   const p = profileOf(exercise.muscle);
   const step = exercise.step || p.step;
-  return `saltos de ${fmtNum(step, 2)} kg · banda ${p.pct[0]}-${p.pct[1]} % · objetivo ≈${fmtNum(p.weekly, 1)} %/semana`;
+  return `saltos de ${fmtNum(step, 2)} kg · banda ${bandText(exercise.muscle)} · objetivo ≈${fmtNum(p.weekly, 1)} %/semana`;
 }
 
 export const weeklyTarget = (muscle) => profileOf(muscle).weekly;
@@ -68,7 +74,7 @@ function readyMyo(entry) {
     ready: act > MYO_TARGET[1],
     extra: plan.verdict === 'light',
     deload: act < 6,
-    detail: `activación de ${act} reps`,
+    detail: `una activación de ${act} reps`,
   };
 }
 
@@ -103,15 +109,29 @@ function readiness(entry, plan) {
 }
 
 // ---------- Sugerencia ----------
-// history: entradas pasadas de este ejercicio, de la más reciente a la más antigua.
+// history: entradas pasadas de este ejercicio, de la más reciente a la más antigua, ya filtradas por
+// tipo de serie y, si hay, del mismo día de la rutina (ver `historyOf` en store.js).
 // Devuelve { weight, reps, action, reason, inc } — `action` ∈ up | reps | hold | down | start.
 export function suggest({ exercise, plan, history = [] }) {
+  const type = plan.type;
+  // Reps que acompañan al peso: en un drop set, las del primer escalón. En myo-reps y rest-pause no
+  // hay una cifra única que dar, porque mandan la activación y el esquema.
+  const firstStep = (plan.dropScheme || [])[0] ?? null;
+  const baseReps = type === 'normal' ? (plan.repsMin ?? null) : type === 'dropset' ? firstStep : null;
+  // Cifra y unidad con espacio indivisible, para que «20 %» no se parta entre dos líneas.
+  const kg = (v) => `${fmtNum(v, 2)}\u00a0kg`;
+  const pc = (v, d = 1) => `${fmtNum(v, d)}\u00a0%`;
+
   const last = history[0];
   if (!last) {
-    return { weight: null, reps: plan.repsMin ?? null, action: 'start', reason: 'Primera vez: busca un peso que te deje en el RIR objetivo y quedará como referencia.' };
+    const aim = {
+      myo: `con el que la activación caiga entre ${MYO_TARGET[0]} y ${MYO_TARGET[1]} reps`,
+      restpause: 'con el que completes el esquema justo',
+      dropset: 'con el que el primer escalón llegue justo a sus reps',
+    }[type] || 'que te deje en el RIR objetivo';
+    return { weight: null, reps: baseReps, action: 'start', reason: `Primera vez: busca un peso ${aim} y quedará como referencia.` };
   }
 
-  const type = plan.type;
   // Ojo: 0 es un peso válido (peso corporal), así que no vale un simple `||`.
   const weights = (last.sets || []).map((s) => setWeight(s, type)).filter((w) => w != null);
   const lastWeight = type === 'dropset'
@@ -119,7 +139,18 @@ export function suggest({ exercise, plan, history = [] }) {
     : (weights.length ? Math.max(...weights) : null);
 
   if (lastWeight == null) {
-    return { weight: null, reps: plan.repsMin ?? null, action: 'start', reason: 'La última sesión quedó sin registrar peso.' };
+    return { weight: null, reps: baseReps, action: 'start', reason: 'La última sesión quedó sin registrar peso.' };
+  }
+
+  // Referencia prestada de otro día de la rutina: sirve para arrancar, pero no para decidir si toca
+  // subir, porque allí el ejercicio iba en otro orden y con otra fatiga encima.
+  if (last.otherDay) {
+    return {
+      weight: lastWeight,
+      reps: baseReps,
+      action: 'start',
+      reason: `En este día aún no lo has hecho: empieza con el peso de «${last.dayName || 'otro día'}», con la misma técnica, y ajusta. Desde hoy se compara con este día.`,
+    };
   }
 
   const r = readiness(last, plan);
@@ -128,10 +159,10 @@ export function suggest({ exercise, plan, history = [] }) {
   if (r.deload) {
     return {
       weight: Math.max(0, roundToStep(lastWeight - inc, exercise.step || inc)),
-      reps: plan.repsMin ?? null,
+      reps: baseReps,
       action: 'down',
       inc: -inc,
-      reason: `Te quedaste corto (${r.detail}). Baja ${inc} kg y reconstruye desde ahí.`,
+      reason: `Te quedaste corto, con ${r.detail}. Baja ${kg(inc)} y reconstruye desde ahí.`,
     };
   }
 
@@ -141,20 +172,21 @@ export function suggest({ exercise, plan, history = [] }) {
       const prev = history[1];
       const prevReady = prev && readiness(prev, plan).ready;
       if (!prevReady) {
+        const moreReps = type === 'normal' ? (plan.repsMax ?? plan.repsMin) : type === 'dropset' ? firstStep : null;
         return {
           weight: lastWeight,
-          reps: plan.repsMax != null ? plan.repsMax + 1 : null,
+          reps: moreReps != null ? moreReps + 1 : null,
           action: 'reps',
-          reason: `Con ${lastWeight} kg el siguiente escalón son ${inc} kg (${pct.toFixed(0)} %), por encima del ${band[1]} % que le corresponde a ${muscleName(exercise.muscle).toLowerCase()}. Repite el peso y súmale reps: al encadenar dos sesiones cumpliendo el objetivo, subes.`,
+          reason: `Con ${kg(lastWeight)} el siguiente escalón son ${kg(inc)}, un ${pc(pct, 0)}, por encima del ${pc(band[1])} que le corresponde a ${muscleName(exercise.muscle).toLowerCase()}. Repite el peso y súmale reps: al encadenar dos sesiones cumpliendo el objetivo, subes.`,
         };
       }
     }
     return {
       weight: roundToStep(lastWeight + inc, exercise.step || inc),
-      reps: plan.repsMin ?? null,
+      reps: baseReps,
       action: 'up',
       inc,
-      reason: `Cumpliste el objetivo (${r.detail}). Sube ${inc} kg (${pct.toFixed(1)} %) y vuelve a la parte baja del rango.`,
+      reason: `Cumpliste el objetivo con ${r.detail}. Sube ${kg(inc)}, un ${pc(pct)}, y vuelve a la parte baja del rango.`,
     };
   }
 
@@ -164,7 +196,7 @@ export function suggest({ exercise, plan, history = [] }) {
       weight: lastWeight,
       reps: plan.repsMax ?? plan.repsMin ?? null,
       action: 'hold',
-      reason: `Sacaste las reps (${r.detail}) pero con más margen del que pide el objetivo (RIR ${plan.rir}). Mismo peso y apriétalo hasta ahí; cuando lo cumplas, sube.`,
+      reason: `Sacaste ${r.detail}, pero con más margen del que pide el objetivo, que es RIR ${plan.rir}. Mismo peso y apriétalo hasta ahí; cuando lo cumplas, sube.`,
     };
   }
 
@@ -174,15 +206,21 @@ export function suggest({ exercise, plan, history = [] }) {
       weight: lastWeight,
       reps: null,
       action: 'hold',
-      reason: `Activación de ${act} reps: aún dentro de la banda objetivo (${MYO_TARGET[0]}-${MYO_TARGET[1]}). Mantén el peso y busca más reps.`,
+      reason: `Activación de ${act} reps, aún dentro de la banda objetivo de ${MYO_TARGET[0]}-${MYO_TARGET[1]}. Mantén el peso y busca más reps.`,
     };
   }
 
+  const goal = type === 'restpause'
+    ? 'Cuando completes el total del esquema, toca subir.'
+    : type === 'dropset'
+      ? 'Cuando el primer escalón llegue a sus reps, toca subir.'
+      : 'Cuando llegues al tope del rango en todas las series, toca subir.';
+  const lastTop = Math.max(0, ...(last.sets || []).map((s) => num(s.r) || 0));
   return {
     weight: lastWeight,
-    reps: Math.min((plan.repsMax ?? 99), (Math.max(...(last.sets || []).map((s) => num(s.r) || 0)) || 0) + 1) || plan.repsMin,
+    reps: type === 'normal' ? (Math.min(plan.repsMax ?? 99, lastTop + 1) || plan.repsMin) : baseReps,
     action: 'reps',
-    reason: `Mismo peso y una rep más que la última vez (${r.detail || 'sin datos'}). Cuando llegues al tope del rango en todas las series, toca subir.`,
+    reason: `Mismo peso y una rep más que la última vez${r.detail ? `, que fueron ${r.detail}` : ''}. ${goal}`,
   };
 }
 

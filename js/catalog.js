@@ -19,9 +19,9 @@ export const MUSCLES = [
   { id: 'gemelo', name: 'Gemelo', short: 'Gemelo', emoji: '🦶', region: 'pierna' },
   { id: 'espalda', name: 'Espalda', short: 'Espalda', emoji: '🔙', region: 'torso' },
   { id: 'pecho', name: 'Pecho', short: 'Pecho', emoji: '🛡️', region: 'torso' },
-  { id: 'hombro', name: 'Hombro (anterior)', short: 'Hombro', emoji: '🪖', region: 'torso' },
-  { id: 'lateral', name: 'Deltoides lateral', short: 'Lateral', emoji: '🦅', region: 'torso' },
-  { id: 'posterior', name: 'Deltoides posterior', short: 'Posterior', emoji: '🪶', region: 'torso' },
+  { id: 'hombro', name: 'Hombro anterior', short: 'Hombro', emoji: '🪖', region: 'torso' },
+  { id: 'lateral', name: 'Hombro lateral', short: 'Lateral', emoji: '🦅', region: 'torso' },
+  { id: 'posterior', name: 'Hombro posterior', short: 'Posterior', emoji: '🪶', region: 'torso' },
   { id: 'biceps', name: 'Bíceps', short: 'Bíceps', emoji: '💪', region: 'brazo' },
   { id: 'triceps', name: 'Tríceps', short: 'Tríceps', emoji: '🔺', region: 'brazo' },
   { id: 'abdomen', name: 'Abdomen', short: 'Abdomen', emoji: '🧱', region: 'core' },
@@ -107,7 +107,7 @@ export const SET_TYPES = {
   },
   myo: {
     id: 'myo', label: 'Myo-reps', short: 'Myo-reps', icon: 'zap',
-    hint: `Activación al fallo, ${MYO_REST_FIRST}" y ${MYO_MINIS} mini-series con las reps de la tabla (${MYO_REST}" entre ellas), y una última al fallo.`,
+    hint: `Activación al fallo, ${MYO_REST_FIRST}" y ${MYO_MINIS} mini-series con las reps de la tabla, con ${MYO_REST}" entre ellas, y una última al fallo.`,
   },
   restpause: {
     id: 'restpause', label: 'Rest-pause', short: 'Rest-pause', icon: 'clock',

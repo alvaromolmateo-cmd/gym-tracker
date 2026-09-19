@@ -4,13 +4,25 @@ import { esc, icon, fmtNum, toast, confirmDialog, openModal, closeModal, modalHe
 import { getState, addExercise, patchExercise, removeExercise, exerciseById } from '../store.js';
 import { MUSCLES, EQUIPMENT, muscleName, profileOf } from '../catalog.js';
 import { exerciseSeries, bestOf } from '../metrics.js';
-import { increment, profileSummary } from '../progression.js';
+import { increment, profileSummary, bandText } from '../progression.js';
 import { fmtSet } from '../sets.js';
 import { historyOf } from '../store.js';
-import { muscleChip, emptyState } from './shared.js';
+import { muscleChip, typeChip, emptyState } from './shared.js';
 
 // Escalones de carga habituales en el gimnasio, para no tener que teclearlos.
 const STEPS = [1.25, 2.5, 5, 10];
+
+// Sobrecarga progresiva que corresponde al grupo muscular elegido, con un ejemplo del próximo salto
+// desde el mejor peso registrado (o desde 50 kg si aún no hay ninguno).
+function profileBox(ex, best) {
+  const p = profileOf(ex.muscle);
+  const from = best?.weight?.weight || 50;
+  const next = increment(from, ex);
+  return `
+    <div class="profile-head">${icon('target')} Sobrecarga progresiva para ${esc(muscleName(ex.muscle).toLowerCase())}</div>
+    <p>Banda de subida <b>${bandText(ex.muscle)}</b> por salto · ritmo esperable <b>≈${fmtNum(p.weekly, 1)} %/semana</b> · referencia de volumen <b>${p.sets[0]}-${p.sets[1]} series/semana</b>.</p>
+    <p class="muted">Con el incremento de ${fmtNum(ex.step, 2)} kg, desde ${fmtNum(from, 2)} kg el próximo escalón sería de ${fmtNum(next.inc, 2)} kg, un ${fmtNum(next.pct, 1)} %.</p>`;
+}
 
 export function render(ctx) {
   const st = getState();
@@ -53,11 +65,11 @@ export function render(ctx) {
               </div>
               <div class="ex-chips">${muscleChip(e.muscle)}<span class="chip chip-eq">${esc(e.equipment)}</span></div>
               <div class="ex-stats">
-                <span><small>Mejor</small><b>${best?.weight ? `${fmtNum(best.weight.weight, 1)} kg` : '—'}</b></span>
+                <span><small>Mejor</small><b>${best?.weight ? `${fmtNum(best.weight.weight, 2)} kg` : '—'}</b></span>
                 <span><small>1RM est.</small><b>${best?.e1rm ? `${fmtNum(best.e1rm.e1rm, 1)} kg` : '—'}</b></span>
                 <span><small>Salto</small><b>${fmtNum(inc.inc, 2)} kg</b></span>
               </div>
-              <div class="ex-profile">${esc(`${p.pct[0]}-${p.pct[1]} % por salto · ≈${fmtNum(p.weekly, 1)} %/semana`)}</div>
+              <div class="ex-profile">${esc(`${bandText(e.muscle)} por salto · ≈${fmtNum(p.weekly, 1)} %/semana`)}</div>
             </button>`;
         }).join('')}
       </div>` : emptyState('Ningún ejercicio con ese filtro.')}
@@ -76,7 +88,6 @@ function openExercise(id) {
 
   const draw = () => {
     const ex = isNew ? draft : exerciseById(id);
-    const p = profileOf(ex.muscle);
     const history = isNew ? [] : historyOf(id);
     const best = isNew ? null : bestOf(id);
 
@@ -99,7 +110,7 @@ function openExercise(id) {
           </label>
         </div>
         <div class="form-row">
-          <label class="fld">Incremento mínimo (kg)
+          <label class="fld">Incremento mínimo en kg
             <input class="input" type="number" step="0.25" min="0.25" value="${ex.step}" data-f="step">
           </label>
           <label class="fld">Cuenta el peso corporal
@@ -109,13 +120,9 @@ function openExercise(id) {
         <div class="seg seg-wrap step-seg">
           ${STEPS.map((v) => `<button class="seg-btn${Number(ex.step) === v ? ' on' : ''}" data-step="${v}">${fmtNum(v, 2)} kg</button>`).join('')}
         </div>
-        <p class="hint">En poleas, máquinas de placas y lastre puedes colgar el disco de sobrecarga de 1,25 kg. En mancuernas y barras el escalón real no baja de 2,5 kg (los discos van de dos en dos).</p>
+        <p class="hint">En poleas, máquinas de placas y lastre puedes colgar el disco de sobrecarga de 1,25 kg. En mancuernas y barras el escalón real no baja de 2,5 kg, porque los discos van de dos en dos.</p>
 
-        <div class="profile-box">
-          <div class="profile-head">${icon('target')} Sobrecarga progresiva para ${esc(muscleName(ex.muscle))}</div>
-          <p>Banda de subida <b>${p.pct[0]}-${p.pct[1]} %</b> por salto (ACSM 2009: menos en músculos pequeños, más en los grandes) · ritmo esperable <b>≈${fmtNum(p.weekly, 1)} %/semana</b> · referencia de volumen <b>${p.sets[0]}-${p.sets[1]} series/semana</b>.</p>
-          <p class="muted">Con el incremento de ${fmtNum(ex.step, 2)} kg, desde ${fmtNum(best?.weight?.weight || 50, 0)} kg el próximo escalón sería de ${fmtNum(increment(best?.weight?.weight || 50, ex).inc, 2)} kg (${fmtNum(increment(best?.weight?.weight || 50, ex).pct, 1)} %).</p>
-        </div>
+        <div class="profile-box" data-profile>${profileBox(ex, best)}</div>
 
         <label class="fld">Notas
           <input class="input" type="text" value="${esc(ex.notes)}" data-f="notes" placeholder="Asiento en el 4, agarre cerrado…">
@@ -127,7 +134,7 @@ function openExercise(id) {
             ${history.slice(0, 10).map((h) => `
               <div class="hist-row">
                 <span class="hist-date">${esc(h.date.slice(8, 10))}/${esc(h.date.slice(5, 7))}</span>
-                <span class="hist-sets">${h.sets.map((s) => esc(fmtSet(s, h.type, { bw: ex.bw }))).filter((x) => x !== '—').join(' · ')}</span>
+                <span class="hist-sets">${typeChip(h.type)}${h.sets.map((s) => esc(fmtSet(s, h.type, { bw: ex.bw }))).filter((x) => x !== '—').join(' · ')}</span>
               </div>`).join('')}
           </div>` : ''}
       </div>
@@ -140,6 +147,17 @@ function openExercise(id) {
   openModal({
     render: draw,
     mount: (panel) => {
+      // El grupo muscular y el incremento cambian la sobrecarga que toca: se repinta ese recuadro (y
+      // el subtítulo) a mano, sin redibujar la ficha, para no perder lo que se esté escribiendo.
+      const refreshProfile = () => {
+        const ex = isNew ? draft : exerciseById(id);
+        const box = panel.querySelector('[data-profile]');
+        if (box) box.innerHTML = profileBox(ex, isNew ? null : bestOf(id));
+        const sub = panel.querySelector('.modal-sub');
+        if (sub && !isNew) sub.textContent = profileSummary(ex);
+        panel.querySelectorAll('[data-step]').forEach((x) => x.classList.toggle('on', Number(x.dataset.step) === Number(ex.step)));
+      };
+
       panel.querySelectorAll('[data-f]').forEach((input) => {
         const field = input.dataset.f;
         const read = () => {
@@ -151,6 +169,7 @@ function openExercise(id) {
         input.addEventListener(ev, () => {
           if (isNew) draft[field] = read();
           else patchExercise(id, { [field]: read() }, { silent: ev === 'input' && field !== 'muscle' });
+          if (field === 'muscle' || field === 'step') refreshProfile();
         });
       });
       panel.querySelectorAll('[data-step]').forEach((b) => b.addEventListener('click', () => {
@@ -158,7 +177,7 @@ function openExercise(id) {
         if (isNew) {
           draft.step = v;
           panel.querySelector('[data-f="step"]').value = v;
-          panel.querySelectorAll('[data-step]').forEach((x) => x.classList.toggle('on', Number(x.dataset.step) === v));
+          refreshProfile();
         } else {
           patchExercise(id, { step: v });
         }

@@ -99,8 +99,8 @@ export const fmtWeight = (w, bw = false) => {
   const v = num(w);
   if (v == null) return '—';
   if (bw && v === 0) return 'BW';
-  if (bw && v > 0) return `BW+${fmtNum(v, 1)}`;
-  return `${fmtNum(v, 1)} kg`;
+  if (bw && v > 0) return `BW+${fmtNum(v, 2)}`;
+  return `${fmtNum(v, 2)} kg`;
 };
 
 export function fmtSet(set, type, { bw = false } = {}) {
@@ -116,7 +116,7 @@ export function fmtSet(set, type, { bw = false } = {}) {
   if (type === 'dropset') {
     // Se muestran también los escalones con peso pero sin reps apuntadas (el último suele ir al fallo).
     const chain = (set.drops || []).filter((d) => num(d.w) != null || num(d.r) != null)
-      .map((d) => `${fmtNum(num(d.w) || 0, 1)}×${num(d.r) ?? '—'}`).join(' → ');
+      .map((d) => `${fmtNum(num(d.w) || 0, 2)}×${num(d.r) ?? '—'}`).join(' → ');
     return chain || '—';
   }
   const reps = set.raw || (num(set.r) != null ? String(set.r) : null);

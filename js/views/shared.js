@@ -106,9 +106,9 @@ export function myoGuide(activation) {
   const verdict = !activation
     ? '<span class="muted">Apunta las reps de la activación y te digo las de las mini-series.</span>'
     : p.verdict === 'heavy'
-      ? '<span class="warn">Menos de 6 reps: el peso se te ha ido, baja para la próxima.</span>'
+      ? '<span class="warn">Menos de 6 reps – El peso se te ha ido, baja para la próxima.</span>'
       : p.verdict === 'light'
-        ? '<span class="warn">Más de 20 reps: demasiado ligero, sube en la próxima sesión.</span>'
+        ? '<span class="warn">Más de 20 reps – Demasiado ligero, sube en la próxima sesión.</span>'
         : `<span class="muted">Activación de ${activation} reps → mini-series de ${p.reps}.</span>`;
   const step = (name, value, key = false) => `<span class="chain-step${key ? ' is-key' : ''}"><small>${name}</small><b>${value}</b></span>`;
   const rest = (secs) => `<span class="chain-rest">${secs}"</span>`;

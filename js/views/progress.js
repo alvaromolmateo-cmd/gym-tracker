@@ -10,6 +10,7 @@ import {
   muscleProgress, adherence, weekStreak, sessionTotals, hasLog,
 } from '../metrics.js';
 import { todayKey } from '../dates.js';
+import { bandText } from '../progression.js';
 import { volumeBars } from './shared.js';
 
 const RANGES = [
@@ -93,7 +94,7 @@ export function render(ctx) {
 
       <div class="card">
         <h2>${icon('layers')} Volumen por grupo muscular</h2>
-        <p class="muted">Media de series efectivas por semana en el rango elegido. La banda clara marca las 12-20 series semanales que la revisión de Baz-Valle (2022) sitúa como zona útil en gente entrenada.</p>
+        <p class="muted">Media de series efectivas por semana en el rango elegido. La banda clara marca las 12-20 series semanales que la revisión de Baz-Valle de 2022 sitúa como zona útil en gente entrenada.</p>
         ${volumeBars(volAvg)}
       </div>
     </div>
@@ -159,7 +160,7 @@ function progressTable() {
         </tbody>
       </table>
     </div>
-    <p class="hint">Referencia: la ACSM recomienda subir la carga entre un 2 % (músculos pequeños) y un 10 % (grandes) cuando se superan las reps objetivo; el ritmo semanal esperable es menor que ese salto porque no se sube todas las semanas.</p>`;
+    <p class="hint">Referencia: la ACSM recomienda subir la carga entre un 2 % en músculos pequeños y un 10 % en los grandes cuando se superan las reps objetivo; el ritmo semanal esperable es menor que ese salto porque no se sube todas las semanas.</p>`;
 }
 
 // ---------- Serie de un ejercicio ----------
@@ -171,13 +172,13 @@ function exerciseChart(exId) {
   return `
     <p class="muted">1RM estimado con la fórmula de Epley sumando las reps en reserva. En myo-reps y rest-pause se toma la serie de activación, que va al fallo.</p>
     ${chart('line', {
-      points: series.map((s) => ({ label: `${Number(s.date.slice(8, 10))}/${Number(s.date.slice(5, 7))}`, value: s.e1rm ? Math.round(s.e1rm * 10) / 10 : null, full: `${s.date} · ${fmtNum(s.weight, 1)} kg × ${s.reps} reps` })),
+      points: series.map((s) => ({ label: `${Number(s.date.slice(8, 10))}/${Number(s.date.slice(5, 7))}`, value: s.e1rm ? Math.round(s.e1rm * 10) / 10 : null, full: `${s.date} · ${fmtNum(s.weight, 2)} kg × ${s.reps} reps` })),
       unit: 'kg', decimals: 1, height: 220, color: 'var(--series-1)',
     })}
     <div class="ex-foot">
-      <span class="muted">${esc(muscleName(ex.muscle))} · saltos de ${fmtNum(ex.step, 2)} kg · banda ${p.pct[0]}-${p.pct[1]} % · objetivo ≈${fmtNum(p.weekly, 1)} %/semana</span>
+      <span class="muted">${esc(muscleName(ex.muscle))} · saltos de ${fmtNum(ex.step, 2)} kg · banda ${bandText(ex.muscle)} · objetivo ≈${fmtNum(p.weekly, 1)} %/semana</span>
     </div>
-    ${dataTable(series.slice().reverse().map((s) => [shortDate(s.date), `${fmtNum(s.weight, 1)} kg`, String(s.reps), `${fmtNum(s.e1rm, 1)} kg`]), ['Fecha', 'Peso máx.', 'Reps', '1RM est.'])}`;
+    ${dataTable(series.slice().reverse().map((s) => [shortDate(s.date), `${fmtNum(s.weight, 2)} kg`, String(s.reps), `${fmtNum(s.e1rm, 1)} kg`]), ['Fecha', 'Peso máx.', 'Reps', '1RM est.'])}`;
 }
 
 // ---------- Récords ----------
@@ -195,7 +196,7 @@ function records() {
           ${rows.slice(0, 12).map(({ e, best }) => `
             <tr>
               <td>${esc(e.name)}</td>
-              <td class="num">${fmtNum(best.weight?.weight, 1)} kg</td>
+              <td class="num">${fmtNum(best.weight?.weight, 2)} kg</td>
               <td class="num"><b>${fmtNum(best.e1rm.e1rm, 1)} kg</b></td>
               <td class="muted num">${esc(shortDate(best.e1rm.date))}</td>
             </tr>`).join('')}

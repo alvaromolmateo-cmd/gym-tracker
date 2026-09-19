@@ -39,7 +39,7 @@ export function render(ctx) {
     ${week.sessions ? `
       <div class="card">
         <h2>${icon('layers')} Volumen por grupo muscular</h2>
-        <p class="muted">Series efectivas de la semana frente al rango de referencia de la literatura (12-20 para los grupos grandes).</p>
+        <p class="muted">Series efectivas de la semana frente al rango de referencia de la literatura, 12-20 en los grupos grandes.</p>
         ${volumeBars(week.byMuscle)}
       </div>` : ''}
 

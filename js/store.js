@@ -4,7 +4,7 @@
 import { uid } from './ui.js';
 import { todayKey, addDays, weekdayIdx } from './dates.js';
 import { defaultExercises, isLegacyMyoDesc, defaultPlan } from './catalog.js';
-import { emptySet } from './sets.js';
+import { emptySet, hasData } from './sets.js';
 import { ROUTINE_DAYS, isLegacySampleSession } from './seed.js';
 
 const STORAGE_KEY = 'plataforma-entrenamientos:data';
@@ -273,23 +273,29 @@ export const activeSession = () => (state.activeId ? state.sessions[state.active
 
 export const allSessions = () => Object.values(state.sessions).sort((a, b) => (a.date === b.date ? (a.startedAt || '').localeCompare(b.startedAt || '') : a.date.localeCompare(b.date)));
 
-// Entradas pasadas de un ejercicio, de la más reciente a la más antigua.
-// Con `type` se priorizan las del mismo tipo de serie (no tiene sentido sugerir carga para un
-// drop set mirando una sesión de myo-reps); si no hay ninguna, se devuelven todas.
-export function historyOf(exerciseId, { before = null, excludeSession = null, type = null } = {}) {
+// Entradas pasadas de un ejercicio, de la más reciente a la más antigua. Solo cuentan las que
+// tienen reps apuntadas: un ejercicio que se quedó en blanco no es «la última vez».
+// - `type`: solo las de ese tipo de serie. Unas myo-reps no dicen nada del drop set del mismo
+//   ejercicio, así que nunca se mezclan.
+// - `dayId`: una por entreno, y primero las del mismo día de la rutina. Un ejercicio no rinde igual
+//   al principio de la sesión que al final con toda la fatiga encima (Simão et al., 2012), así que se
+//   compara con lo que se hizo en ese mismo hueco. Si en ese día aún no hay nada, valen las de otros
+//   días, marcadas con `otherDay`. `itemId` desempata si el ejercicio se repite dentro del día.
+export function historyOf(exerciseId, { before = null, excludeSession = null, type = null, dayId = null, itemId = null } = {}) {
   const out = [];
   for (const s of allSessions().slice().reverse()) {
     if (excludeSession && s.id === excludeSession) continue;
     if (before && s.date > before) continue;
-    for (const e of s.entries) {
-      if (e.exerciseId !== exerciseId) continue;
-      if (!e.sets.some((set) => Object.values(set).some((v) => v != null && v !== '' && !(Array.isArray(v) && v.every((x) => x == null))))) continue;
-      out.push({ ...e, date: s.date, sessionId: s.id, dayName: s.dayName });
-    }
+    const found = s.entries.filter((e) => e.exerciseId === exerciseId
+      && (!type || e.type === type)
+      && e.sets.some((set) => hasData(set, e.type)));
+    if (!found.length) continue;
+    const picked = dayId ? [found.find((e) => itemId && e.plan?.id === itemId) || found[0]] : found;
+    for (const e of picked) out.push({ ...e, date: s.date, sessionId: s.id, dayId: s.dayId, dayName: s.dayName });
   }
-  if (!type) return out;
-  const same = out.filter((e) => e.type === type);
-  return same.length ? same : out;
+  if (!dayId) return out;
+  const same = out.filter((e) => e.dayId === dayId);
+  return same.length ? same : out.map((e) => ({ ...e, otherDay: true }));
 }
 
 // ---------- Sesiones ----------
