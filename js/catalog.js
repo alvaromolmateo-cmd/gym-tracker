@@ -155,8 +155,8 @@ const EXERCISES = [
   ['abdominales-polea', 'Abdominales en polea', 'abdomen', 'Polea', 1.25],
 
   ['press-militar-mancuerna', 'Press militar con mancuernas', 'hombro', 'Mancuernas', 2.5, { secondary: ['triceps'] }],
-  ['laterales-mancuerna', 'Laterales con mancuernas (eje lateral)', 'lateral', 'Mancuernas', 2.5],
-  ['laterales-polea', 'Laterales en polea con muñequeras (eje escapular)', 'lateral', 'Polea', 1.25],
+  ['laterales-mancuerna', 'Laterales con mancuernas', 'lateral', 'Mancuernas', 2.5],
+  ['laterales-polea', 'Laterales en polea con muñequeras', 'lateral', 'Polea', 1.25],
   ['posterior-polea', 'Posterior en polea', 'posterior', 'Polea', 1.25],
   ['curl-biceps-polea', 'Curl de bíceps en polea a una mano con banco', 'biceps', 'Polea', 1.25],
   ['curl-biceps-inclinado', 'Curl bíceps inclinado con mancuerna', 'biceps', 'Mancuernas', 2.5],

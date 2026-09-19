@@ -8,7 +8,7 @@ import { emptySet, hasData } from './sets.js';
 import { ROUTINE_DAYS, isLegacySampleSession } from './seed.js';
 
 const STORAGE_KEY = 'plataforma-entrenamientos:data';
-export const DATA_VERSION = 3;
+export const DATA_VERSION = 4;
 
 // v3: en el gimnasio hay discos de sobrecarga de 1,25 kg, así que en poleas, máquinas de placas
 // y lastre el escalón mínimo real es ese y no 2,5 kg. Solo se corrige si seguía en el valor viejo.
@@ -21,6 +21,13 @@ const STEP_V3 = {
   'triceps-barra': 1.25,
   'press-pectoral-maquina': 1.25,
   fondos: 1.25,
+};
+
+// v4: los nombres del catálogo pierden el paréntesis del eje (petición del usuario). Solo si seguían
+// tal cual venían: un nombre cambiado a mano no se toca, y tampoco si el nuevo ya lo usa otro ejercicio.
+const NAMES_V4 = {
+  'laterales-mancuerna': ['Laterales con mancuernas (eje lateral)', 'Laterales con mancuernas'],
+  'laterales-polea': ['Laterales en polea con muñequeras (eje escapular)', 'Laterales en polea con muñequeras'],
 };
 
 export const DEFAULT_SETTINGS = {
@@ -111,6 +118,13 @@ function migrate(data) {
   if (from < 3) {
     for (const e of out.exercises) {
       if (STEP_V3[e.id] && e.step === 2.5) e.step = STEP_V3[e.id];
+    }
+  }
+
+  if (from < 4) {
+    for (const e of out.exercises) {
+      const [before, after] = NAMES_V4[e.id] || [];
+      if (before && e.name === before && !out.exercises.some((x) => x.name === after)) e.name = after;
     }
   }
 

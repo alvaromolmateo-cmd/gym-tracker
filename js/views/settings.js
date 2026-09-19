@@ -5,7 +5,7 @@ import { getState, setSetting, exportJSON, importJSON, resetAll, storageInfo, sa
 import { MYO_TABLE, MYO_REST_FIRST, MYO_REST, MYO_MINIS } from '../catalog.js';
 
 // Versión que se enseña en Ajustes. Se sube a la vez que `VERSION` en sw.js.
-export const APP_VERSION = '1.5.0';
+export const APP_VERSION = '1.5.1';
 
 // De dónde sale cada número de la app. Se listan aparte para que no se coman la explicación.
 const REFERENCES = [
