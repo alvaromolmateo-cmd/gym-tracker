@@ -1,6 +1,6 @@
 // Arranque: enrutado por hash, render de vistas, tema, service worker e instalación PWA.
 
-import { getState, subscribe, activeSession, allSessions } from './store.js';
+import { getState, subscribe, activeSession, allSessions, rescuedOnLoad } from './store.js';
 import { refreshModal, toast } from './ui.js';
 import { mountCharts } from './charts.js';
 import { todayKey } from './dates.js';
@@ -34,6 +34,7 @@ const ctx = {
   },
   applyTheme,
   refreshShell,
+  rerender: () => render(),
   async install() {
     if (!ctx.installPrompt) return;
     ctx.installPrompt.prompt();
@@ -148,3 +149,5 @@ if ('serviceWorker' in navigator) {
 
 applyTheme();
 render();
+
+if (rescuedOnLoad) toast('No se pudieron abrir tus datos guardados. Están apartados en Ajustes, sin borrar.', 8000);

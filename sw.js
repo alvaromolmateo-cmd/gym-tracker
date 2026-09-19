@@ -1,7 +1,7 @@
 // Service worker: precachea la app y sirve con «red primero, caché si falla», para que funcione
 // sin cobertura en el gimnasio y a la vez reciba las actualizaciones en cuanto haya red.
 
-const VERSION = 'v1.3.0';
+const VERSION = 'v1.4.0';
 const CACHE = `gymtracker-${VERSION}`;
 const ASSETS = [
   './',

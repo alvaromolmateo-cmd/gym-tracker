@@ -24,7 +24,7 @@ export function render() {
     <div class="page-head">
       <div>
         <h1>Rutina</h1>
-        <p class="muted">Lo que te ha puesto el entrenador. Lo que cambies aquí sale en el próximo entreno.</p>
+        <p class="muted">Tu planificación. Lo que cambies aquí sale en el próximo entreno.</p>
       </div>
       <div class="page-actions">
         <button class="btn" data-add-day>${icon('plus')} Día</button>

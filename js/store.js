@@ -2,10 +2,10 @@
 // Capa aislada para poder cambiar el almacenamiento (sincronización en la nube) más adelante.
 
 import { uid } from './ui.js';
-import { todayKey } from './dates.js';
+import { todayKey, addDays, weekdayIdx } from './dates.js';
 import { defaultExercises, isLegacyMyoDesc, defaultPlan } from './catalog.js';
 import { emptySet } from './sets.js';
-import { ROUTINE_DAYS, ROUTINE_START, SEED_SESSIONS } from './seed.js';
+import { ROUTINE_DAYS, isLegacySampleSession } from './seed.js';
 
 const STORAGE_KEY = 'plataforma-entrenamientos:data';
 export const DATA_VERSION = 3;
@@ -32,11 +32,14 @@ export const DEFAULT_SETTINGS = {
 
 const withIds = (items) => items.map((it) => ({ id: uid(), note: '', ...it }));
 
+// La semana 1 de la rutina es la semana en que se empieza a usar la app.
+const thisMonday = () => addDays(todayKey(), -weekdayIdx(todayKey()));
+
 function defaultRoutine() {
   return {
     id: 'rutina-actual',
-    name: 'Planificación actual',
-    startDate: ROUTINE_START,
+    name: 'Rutina de ejemplo',
+    startDate: thisMonday(),
     days: ROUTINE_DAYS.map((d) => ({ ...d, items: withIds(d.items) })),
   };
 }
@@ -72,33 +75,13 @@ function plannedSets(item) {
   return Array.from({ length: Math.max(1, item.sets || 1) }, () => emptySet(item.type, item));
 }
 
-function seedSessions(routine) {
-  const out = {};
-  for (const s of SEED_SESSIONS) {
-    const session = buildSession(routine, s.dayId, s.date);
-    session.startedAt = `${s.date}T18:00:00.000Z`;
-    session.endedAt = `${s.date}T19:30:00.000Z`;
-    session.note = s.note;
-    session.feel = s.feel;
-    for (const entry of session.entries) {
-      const logged = s.entries[entry.exerciseId];
-      if (!logged) continue;
-      entry.note = logged.note || '';
-      entry.sets = logged.sets.map((set) => ({ ...emptySet(entry.type, entry.plan), ...set }));
-    }
-    out[session.id] = session;
-  }
-  return out;
-}
-
 export function defaultState() {
-  const routine = defaultRoutine();
   return {
     version: DATA_VERSION,
     createdAt: new Date().toISOString(),
     exercises: defaultExercises(),
-    routine,
-    sessions: seedSessions(routine),
+    routine: defaultRoutine(),
+    sessions: {},
     activeId: null,
     settings: { ...DEFAULT_SETTINGS },
   };
@@ -136,7 +119,7 @@ function migrate(data) {
     ? {
       id: r.id || uid(),
       name: r.name || 'Planificación actual',
-      startDate: r.startDate || ROUTINE_START,
+      startDate: r.startDate || thisMonday(),
       days: r.days.map((d) => ({
         id: d.id || uid(),
         name: d.name || 'Día',
@@ -179,13 +162,62 @@ function migrate(data) {
 }
 
 // ---------- Carga y guardado ----------
-function load() {
+// Red de seguridad: lo guardado no se pisa sin dejar copia.
+// - Si los datos vienen de otra versión de la app, antes de adaptarlos se guarda una copia tal cual
+//   (`:copia`), por si la actualización trajera algún fallo.
+// - Si no se pueden leer, se apartan en `:rescate` y la app arranca en blanco; ahí se quedan hasta
+//   que se descarguen o se descarten desde Ajustes. Si ni siquiera se pueden apartar, no se guarda
+//   nada para no pisarlos.
+const BACKUP_KEY = `${STORAGE_KEY}:copia`;
+const RESCUE_KEY = `${STORAGE_KEY}:rescate`;
+let readOnly = false;
+export let rescuedOnLoad = false;
+
+const stamp = (raw, version) => ({ savedAt: new Date().toISOString(), version, raw });
+
+function readRescues() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return defaultState();
-    return migrate(JSON.parse(raw));
+    const list = JSON.parse(localStorage.getItem(RESCUE_KEY) || '[]');
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
+}
+
+function load() {
+  let raw = null;
+  try {
+    raw = localStorage.getItem(STORAGE_KEY);
   } catch (err) {
     console.warn('No se pudo leer el almacenamiento:', err);
+    return defaultState();
+  }
+  if (!raw) return defaultState();
+
+  let version = null;
+  try {
+    const data = JSON.parse(raw);
+    version = Number(data?.version) || 1;
+    if (version !== DATA_VERSION) {
+      try {
+        localStorage.setItem(BACKUP_KEY, JSON.stringify(stamp(raw, version)));
+      } catch (err) {
+        console.warn('No se pudo guardar la copia previa a la actualización:', err);
+      }
+    }
+    return migrate(data);
+  } catch (err) {
+    console.warn('No se pudieron leer los datos guardados; se apartan sin tocarlos:', err);
+    try {
+      const rescues = readRescues();
+      // Si ya estaban apartados (se ha recargado sin tocar nada), no se duplican.
+      if (!rescues.some((r) => r.raw === raw)) {
+        localStorage.setItem(RESCUE_KEY, JSON.stringify([...rescues, stamp(raw, version)]));
+      }
+      rescuedOnLoad = true;
+    } catch {
+      readOnly = true;
+    }
     return defaultState();
   }
 }
@@ -194,6 +226,7 @@ let state = load();
 const listeners = new Set();
 
 function save() {
+  if (readOnly) return;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch (err) {
@@ -202,6 +235,20 @@ function save() {
 }
 
 save(); // deja escrito el resultado de la migración sin esperar al primer cambio
+
+// Pide al navegador que no borre estos datos cuando ande justo de espacio (Safari, sobre todo).
+try { navigator.storage?.persist?.()?.catch?.(() => {}); } catch { /* sin soporte */ }
+
+// Copias que guarda la red de seguridad, para descargarlas o descartarlas desde Ajustes.
+export function safetyCopies() {
+  let backup = null;
+  try { backup = JSON.parse(localStorage.getItem(BACKUP_KEY) || 'null'); } catch { /* ilegible */ }
+  return { backup, rescues: readRescues(), readOnly };
+}
+
+export function discardSafetyCopy(kind) {
+  try { localStorage.removeItem(kind === 'rescue' ? RESCUE_KEY : BACKUP_KEY); } catch { /* sin acceso */ }
+}
 
 const emit = () => listeners.forEach((fn) => fn(state));
 
@@ -464,6 +511,18 @@ export function importJSON(text) {
   state = migrate(JSON.parse(text));
   save();
   emit();
+}
+
+// Entrenos de ejemplo con los que venía precargada la app hasta la v1.3 (ver seed.js).
+export const legacySampleSessions = () => Object.values(state.sessions).filter(isLegacySampleSession);
+
+export function removeLegacySampleSessions() {
+  const ids = legacySampleSessions().map((s) => s.id);
+  update((st) => {
+    for (const id of ids) delete st.sessions[id];
+    if (st.activeId && !st.sessions[st.activeId]) st.activeId = null;
+  });
+  return ids.length;
 }
 
 export function resetAll() {

@@ -24,7 +24,7 @@ La vista principal. Propone el día que toca, y dentro de cada ejercicio muestra
 - **Qué hacer hoy**: peso y reps sugeridos por el motor de progresión, con el motivo explicado.
 - **La última vez**: lo que levantaste, con tus anotaciones, y un botón para copiar los pesos.
 - **Las casillas para apuntar**, adaptadas al tipo de serie (normales, myo-reps, rest-pause, drop set).
-- **Anotaciones** por ejercicio y nota del día al cerrar, como las que escribes en rojo en la libreta.
+- **Anotaciones** por ejercicio y nota del día al cerrar, como en la libreta de siempre.
 
 **Sin cronómetros de descanso**: se descansa por sensaciones. Los únicos pautados son los de las
 myo-reps, y ahí la app se limita a recordarte los 40" y los 20"; no hay temporizador que mirar en
@@ -186,13 +186,25 @@ por encima de 20, de que es demasiado ligero.
 
 ## Datos de partida
 
-La app viene con la **planificación actual** (los 4 días del Excel del entrenador y de la libreta) y
-con la **semana 2 (24-30/8/2026) ya registrada**, para que el motor de progresión tenga referencias
-desde el primer entreno.
+La app arranca con una **rutina de ejemplo** de cuatro días (pierna y torso alternos) hecha con los
+ejercicios del catálogo, con un ejemplo de cada técnica: myo-reps, rest-pause y drop set. Se cambia
+entera desde Rutina. El **historial empieza vacío** y la semana 1 es la semana en que se empieza a
+usar la app (también se cambia desde Rutina).
 
-Los días de la semana de esos cuatro entrenos (lunes, martes, jueves y viernes) son una suposición:
-se pueden corregir desde Historial → detalle. La semana 1 se toma como la del 17/8/2026, que es lo
-que hace que el 24/8 sea la semana 2.
+Las versiones anteriores a la 1.4 venían con una semana de entrenos de ejemplo ya registrada. Quien
+la tenga puede quitarla desde Ajustes → «Quitar los entrenos de ejemplo», que borra solo esos
+entrenos y deja el resto intacto.
+
+## Tus datos entre versiones
+
+Todo se guarda en el propio navegador (`localStorage`); actualizar la app no borra nada:
+
+- Los datos de ejemplo solo se usan la primera vez, cuando no hay nada guardado.
+- Cuando cambia la estructura de los datos, la app los adapta (`migrate` en `store.js`) y antes
+  guarda una **copia automática** tal cual estaban, que se puede descargar desde Ajustes.
+- Si algún día no pudiera leerlos, los **aparta sin borrarlos** en vez de empezar encima, y avisa.
+- Pide al navegador almacenamiento persistente para que no los borre cuando ande justo de espacio.
+  Aun así, en iPhone conviene instalarla en la pantalla de inicio y exportar una copia de vez en cuando.
 
 ---
 

@@ -1,7 +1,7 @@
 // Vista «Ajustes»: preferencias, copia de seguridad y la letra pequeña de cómo calcula la app.
 
 import { esc, icon, fmtNum, toast, confirmDialog } from '../ui.js';
-import { getState, setSetting, exportJSON, importJSON, resetAll, storageInfo } from '../store.js';
+import { getState, setSetting, exportJSON, importJSON, resetAll, storageInfo, safetyCopies, discardSafetyCopy, legacySampleSessions, removeLegacySampleSessions } from '../store.js';
 import { MYO_TABLE, MYO_REST_FIRST, MYO_REST, MYO_MINIS } from '../catalog.js';
 
 // De dónde sale cada número de la app. Se listan aparte para que no se coman la explicación.
@@ -53,6 +53,39 @@ const REFERENCES = [
   },
 ];
 
+// Descarga un texto como archivo .json.
+function download(text, name) {
+  const blob = new Blob([text], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+const fileDate = (iso) => (iso || new Date().toISOString()).slice(0, 10);
+const longDate = (iso) => new Date(iso).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+
+// Copias automáticas de la red de seguridad del almacenamiento (ver store.js).
+function safetyBlock() {
+  const { backup, rescues, readOnly } = safetyCopies();
+  if (!backup && !rescues.length && !readOnly) return '';
+  return `
+    <h3 class="sub-h">${icon('archive')} Copias automáticas</h3>
+    ${readOnly ? '<p class="muted"><b>Los datos guardados no se pudieron abrir y no hay sitio para apartarlos</b>, así que la app no guarda nada para no pisarlos. Exporta o libera espacio antes de seguir.</p>' : ''}
+    ${rescues.length ? `
+      <p class="muted"><b>Hay datos antiguos que la app no pudo abrir.</b> No se han borrado: están apartados aquí. Descárgalos y guárdalos; se podrán importar cuando se corrija el fallo.</p>
+      <div class="btn-row">
+        <button class="btn" data-rescue-get>${icon('download')} Descargar datos apartados</button>
+        <button class="btn btn-danger-ghost" data-rescue-drop>${icon('trash')} Descartar</button>
+      </div>` : ''}
+    ${backup ? `
+      <p class="hint">Copia de antes de la última actualización de la app (${esc(longDate(backup.savedAt))}). Solo hace falta si algo se ve raro tras actualizar.</p>
+      <div class="btn-row">
+        <button class="btn" data-backup-get>${icon('download')} Descargar copia</button>
+      </div>` : ''}`;
+}
+
 const THEMES = [['auto', 'Automático'], ['light', 'Claro'], ['dark', 'Oscuro']];
 
 export function render(ctx) {
@@ -93,6 +126,11 @@ export function render(ctx) {
           <input type="file" accept="application/json,.json" hidden data-file>
         </div>
         <p class="hint">${info.sessions} entrenos · ${fmtNum(info.bytes / 1024, 1)} KB ocupados.</p>
+        ${safetyBlock()}
+        ${legacySampleSessions().length ? `
+          <h3 class="sub-h">${icon('calendar')} Historial de ejemplo</h3>
+          <p class="muted">Las versiones anteriores de la app venían con ${legacySampleSessions().length} entrenos de ejemplo ya registrados (del 24 al 28 de agosto de 2026). Si no son tuyos, puedes quitarlos; el resto de tu historial no se toca.</p>
+          <button class="btn" data-legacy-drop>${icon('trash')} Quitar los entrenos de ejemplo</button>` : ''}
 
         ${ctx.installPrompt && !ctx.standalone ? `
           <h3 class="sub-h">${icon('phone')} Instalar</h3>
@@ -177,13 +215,28 @@ export function mount(root, ctx) {
   root.querySelector('[data-motto]')?.addEventListener('change', () => ctx.refreshShell());
 
   root.querySelector('[data-export]')?.addEventListener('click', () => {
-    const blob = new Blob([exportJSON()], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `entrenamientos-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(a.href);
+    download(exportJSON(), `entrenamientos-${fileDate()}.json`);
     toast('Copia descargada');
+  });
+
+  root.querySelector('[data-backup-get]')?.addEventListener('click', () => {
+    const { backup } = safetyCopies();
+    if (backup) download(backup.raw, `entrenamientos-copia-${fileDate(backup.savedAt)}.json`);
+  });
+  root.querySelector('[data-rescue-get]')?.addEventListener('click', () => {
+    safetyCopies().rescues.forEach((r, i) => download(r.raw, `entrenamientos-apartados-${fileDate(r.savedAt)}-${i + 1}.json`));
+  });
+  root.querySelector('[data-rescue-drop]')?.addEventListener('click', async () => {
+    const ok = await confirmDialog({
+      title: 'Descartar datos apartados',
+      message: 'Se borran para siempre los datos que la app no pudo abrir. Descárgalos antes si hay algo que quieras conservar.',
+      confirmText: 'Descartar',
+    });
+    if (ok) {
+      discardSafetyCopy('rescue');
+      ctx.rerender?.();
+      toast('Datos apartados descartados');
+    }
   });
 
   const file = root.querySelector('[data-file]');
@@ -210,12 +263,21 @@ export function mount(root, ctx) {
     file.value = '';
   });
 
+  root.querySelector('[data-legacy-drop]')?.addEventListener('click', async () => {
+    const ok = await confirmDialog({
+      title: 'Quitar entrenos de ejemplo',
+      message: 'Se borran solo los entrenos de ejemplo del 24 al 28 de agosto de 2026 que venían con la app. Tus entrenos, la rutina y los ejercicios se quedan como están.',
+      confirmText: 'Quitar',
+    });
+    if (ok) toast(`${removeLegacySampleSessions()} entrenos de ejemplo quitados`);
+  });
+
   root.querySelector('[data-install]')?.addEventListener('click', () => ctx.install());
 
   root.querySelector('[data-reset]')?.addEventListener('click', async () => {
     const ok = await confirmDialog({
       title: 'Borrar todo',
-      message: 'Se borran los entrenos, la rutina y los ajustes, y vuelve la planificación de partida. No hay vuelta atrás.',
+      message: 'Se borran los entrenos, la rutina y los ajustes, y vuelve la rutina de ejemplo. No hay vuelta atrás.',
       confirmText: 'Borrar todo',
     });
     if (ok) {
